@@ -5,7 +5,9 @@
  */
 import { redisAvailable, redisCommand } from '@/lib/server/redis';
 
-const buckets = new Map<string, { count: number; resetAt: number }>();
+// globalThis 부착 — Next dev의 라우트별 모듈 분리로 카운터가 흩어지는 것 방지 (인메모리 폴백 한정)
+const buckets: Map<string, { count: number; resetAt: number }> = ((globalThis as Record<string, unknown>).__ifcRateBuckets ??=
+  new Map<string, { count: number; resetAt: number }>()) as Map<string, { count: number; resetAt: number }>;
 
 /** @returns true = 허용, false = 한도 초과 */
 export async function checkRate(key: string, limit: number, windowMs = 24 * 60 * 60 * 1000): Promise<boolean> {

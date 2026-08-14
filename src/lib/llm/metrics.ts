@@ -7,7 +7,9 @@ import { redisAvailable, redisCommand } from '@/lib/server/redis';
 
 export type LlmFeature = 'scenario' | 'roleplay-turn' | 'roleplay-score' | 'hint';
 
-const memory = new Map<string, Record<string, number>>();
+// globalThis에 부착 — Next dev는 라우트별로 모듈을 따로 번들하므로 모듈 스코프 Map은 라우트 간 분리된다
+const memory: Map<string, Record<string, number>> = ((globalThis as Record<string, unknown>).__ifcMetrics ??=
+  new Map<string, Record<string, number>>()) as Map<string, Record<string, number>>;
 
 function dayKey(date = new Date()): string {
   return date.toISOString().slice(0, 10);
