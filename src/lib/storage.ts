@@ -1,12 +1,14 @@
 /**
- * 브라우저 localStorage 저장 — 개인정보 원칙 (PRD §8.2):
- * 프로필·계약(금액 포함)은 여기에만 저장한다. 서버 전송 경로가 없다.
+ * 브라우저 localStorage — 금고(vault) 도입 후의 역할 (2026-08-14):
+ * - 계약(금액 포함)은 vault.ts가 AES-GCM 암호문으로만 저장한다 (평문 저장 금지).
+ * - 프로필은 서버(/api/me)가 단일 출처 — 평문 로컬 캐시는 폐기했다.
+ *   여기 남은 함수는 금고 도입 "이전" 평문 데이터의 이관·정리 전용이다.
  */
-import type { AgentProfile, Contract } from '@/types';
+import type { AgentProfile } from '@/types';
 
-const KEYS = {
+const LEGACY_KEYS = {
   profile: 'ifc.profile.v1',
-  contracts: 'ifc.contracts.v1',
+  contracts: 'ifc.contracts.v1', // 평문 계약 — 이관은 vault.ts의 loadVaultContracts가 수행
 } as const;
 
 function safeParse<T>(raw: string | null): T | null {
@@ -18,41 +20,32 @@ function safeParse<T>(raw: string | null): T | null {
   }
 }
 
-export function loadProfile(): AgentProfile | null {
+/** 구버전 평문 프로필 읽기 — 계정 이관(1회)용. 이관 후 clearLegacyProfile()로 삭제할 것. */
+export function loadLegacyProfile(): AgentProfile | null {
   if (typeof window === 'undefined') return null;
-  const profile = safeParse<AgentProfile>(window.localStorage.getItem(KEYS.profile));
+  const profile = safeParse<AgentProfile>(window.localStorage.getItem(LEGACY_KEYS.profile));
   if (profile) {
-    // 마이그레이션: structureSource 도입(2026-08-13) 이전에 저장된 프로필
     if (!profile.structureSource) {
       profile.structureSource = { advanceRate: 'default', clawbackSchedule: 'default' };
     }
-    // 마이그레이션: recentCommissions[3] → avgCommission3m (2026-08-13 화면 개편)
     const legacy = profile as AgentProfile & { recentCommissions?: [number, number, number] };
     if (profile.avgCommission3m == null && legacy.recentCommissions) {
       const [a, b, c] = legacy.recentCommissions;
       profile.avgCommission3m = Math.round((a + b + c) / 3);
     }
     if (profile.avgCommission3m == null) profile.avgCommission3m = 0;
-    // 마이그레이션: region 'yongsan' → 시군구코드 '11170' (2026-08-13 지역 아키텍처 개편)
     if ((profile.region as string) === 'yongsan') profile.region = '11170';
   }
   return profile;
 }
 
-export function saveProfile(profile: AgentProfile): void {
-  window.localStorage.setItem(KEYS.profile, JSON.stringify(profile));
+export function clearLegacyProfile(): void {
+  window.localStorage.removeItem(LEGACY_KEYS.profile);
 }
 
-export function loadContracts(): Contract[] {
-  if (typeof window === 'undefined') return [];
-  return safeParse<Contract[]>(window.localStorage.getItem(KEYS.contracts)) ?? [];
-}
-
-export function saveContracts(contracts: Contract[]): void {
-  window.localStorage.setItem(KEYS.contracts, JSON.stringify(contracts));
-}
-
+/** 로그아웃/계정 정리 — 평문 잔재와 암호문 모두 제거 */
 export function clearAll(): void {
-  window.localStorage.removeItem(KEYS.profile);
-  window.localStorage.removeItem(KEYS.contracts);
+  window.localStorage.removeItem(LEGACY_KEYS.profile);
+  window.localStorage.removeItem(LEGACY_KEYS.contracts);
+  window.localStorage.removeItem('ifc.contracts.v2');
 }

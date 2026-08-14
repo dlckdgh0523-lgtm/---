@@ -10,7 +10,8 @@ import Link from 'next/link';
 import { useAccount } from '@/lib/account';
 import { assessBusinessRisk, assessRisk, BUSINESS_CATEGORY_OPTIONS, DRIVER_LABEL, isBusinessRiskHigh, RISK_LEVEL_LABEL } from '@/lib/risk';
 import { estimateAdvance, monthsHeld } from '@/lib/cashflow';
-import { loadContracts, saveContracts } from '@/lib/storage';
+import { loadVaultContracts, saveVaultContracts } from '@/lib/vault';
+import VaultGate from '@/components/VaultGate';
 import { man, pct } from '@/lib/format';
 import type { AgentProfile, Contract, ContractFactors, ProductLine } from '@/types';
 
@@ -40,7 +41,16 @@ const EMPTY_FACTORS: ContractFactors = {
   autoTransfer: true,
 };
 
+/** 금고 게이트 — 잠기면 Inner가 언마운트되어 메모리의 계약(금액) 상태가 해제된다 */
 export default function ContractsPage() {
+  return (
+    <VaultGate>
+      <ContractsInner />
+    </VaultGate>
+  );
+}
+
+function ContractsInner() {
   const { status, profile } = useAccount();
   const [contracts, setContracts] = useState<Contract[]>([]);
 
@@ -53,7 +63,7 @@ export default function ContractsPage() {
   const [factors, setFactors] = useState<ContractFactors>({ ...EMPTY_FACTORS });
 
   useEffect(() => {
-    if (status === 'ready') setContracts(loadContracts());
+    if (status === 'ready') void loadVaultContracts().then(setContracts);
   }, [status]);
 
   const assessments = useMemo(() => contracts.map(assessRisk), [contracts]);
@@ -75,7 +85,7 @@ export default function ContractsPage() {
     };
     const next = [...contracts, contract];
     setContracts(next);
-    saveContracts(next);
+    void saveVaultContracts(next); // AES-GCM 암호문으로만 저장
     setLabel('');
     setPremium(0);
     setAdvancePaid(0);
@@ -87,7 +97,7 @@ export default function ContractsPage() {
   function removeContract(id: string) {
     const next = contracts.filter((c) => c.id !== id);
     setContracts(next);
-    saveContracts(next);
+    void saveVaultContracts(next);
   }
 
   const choice = <T extends string>(

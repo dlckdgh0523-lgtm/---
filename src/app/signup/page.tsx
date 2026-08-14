@@ -1,15 +1,19 @@
 'use client';
 
-/** 회원가입 — 이메일 계정 생성 + 이 시점에 메일 수신 동의(기본 OFF)를 받는다. 가입 후 온보딩(/settings)으로. */
+/**
+ * 회원가입 — 받는 것은 이메일과 비밀번호뿐 (이름 등 추가 개인정보 수집 금지 — 2026-08-14 지시).
+ * 원문 비밀번호는 브라우저를 벗어나지 않는다: authProof(파생 해시)만 서버로 전송.
+ * 메일 구독은 계정과 분리 — 설정 화면에서 별도로 등록한다.
+ */
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { deriveAuthProof, openVaultWithPassword } from '@/lib/vault';
 
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [optIn, setOptIn] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -17,16 +21,18 @@ export default function SignupPage() {
     setBusy(true);
     setError('');
     try {
+      const authProof = await deriveAuthProof(email, password); // 원문 대신 파생 해시만 전송
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, emailOptIn: optIn }),
+        body: JSON.stringify({ email, authProof }),
       });
       const json = await res.json();
       if (!res.ok) {
         setError(json.message ?? '가입에 실패했습니다.');
         return;
       }
+      await openVaultWithPassword(email, password); // 금고 자동 열림 (키는 로컬에만)
       router.push('/settings'); // 가입 직후 온보딩
     } catch {
       setError('네트워크 오류 — 다시 시도하세요.');
@@ -38,7 +44,9 @@ export default function SignupPage() {
   return (
     <div className="mx-auto max-w-sm py-12">
       <h1 className="text-2xl font-extrabold text-[#191F28]">회원가입</h1>
-      <p className="mt-1 text-sm text-[#4E5968]">이메일 계정 하나면 어느 기기에서든 이어서 쓸 수 있습니다.</p>
+      <p className="mt-1 text-sm text-[#4E5968]">
+        이메일 계정 하나면 어느 기기에서든 이어서 쓸 수 있습니다. 수집 항목은 이메일과 비밀번호(해시)뿐입니다.
+      </p>
 
       <div className="mt-6 space-y-3">
         <input
@@ -52,16 +60,14 @@ export default function SignupPage() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="비밀번호 (6자 이상)"
           className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-[#3182F6] focus:outline-none"
         />
-        <label className="flex items-start gap-2 rounded-2xl bg-[#F9FAFB] p-3 text-sm text-[#4E5968]">
-          <input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} className="mt-0.5" />
-          <span>
-            매일 오전 10시 "오늘의 접점" 메일을 받습니다 (선택). 접점 정보만 발송되며 메일 하단 링크로 언제든 해제할
-            수 있습니다.
-          </span>
-        </label>
+        <p className="rounded-2xl bg-[#F9FAFB] p-3 text-xs leading-relaxed text-[#4E5968]">
+          비밀번호는 로그인 확인과 <b>금액 데이터 암호화(금고)</b>에 함께 쓰입니다. 원문은 서버로 전송되지 않으며,
+          30분간 활동이 없으면 금고가 자동으로 잠깁니다.
+        </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           onClick={submit}

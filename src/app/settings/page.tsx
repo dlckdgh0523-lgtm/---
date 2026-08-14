@@ -10,7 +10,8 @@ import { useRouter } from 'next/navigation';
 import { logout, pushProfile, useAccount } from '@/lib/account';
 import { CASHFLOW_DEFAULTS } from '@/config/cashflow-defaults';
 import { STRUCTURE_PRESETS } from '@/config/structure-presets';
-import { clearAll, loadProfile } from '@/lib/storage';
+import { clearAll } from '@/lib/storage';
+import VaultGate from '@/components/VaultGate';
 import { man } from '@/lib/format';
 import { SIDO_LIST, findRegion } from '@/data/regions';
 import { fetchRegionRegistry, findPack, type RegionRegistry } from '@/lib/region-registry';
@@ -61,7 +62,16 @@ function Section({
   );
 }
 
+/** 금고 게이트 — 설정에는 금액 입력(D)이 있어 잠금 대상이다. 잠기면 Inner 언마운트. */
 export default function SettingsPage() {
+  return (
+    <VaultGate>
+      <SettingsInner />
+    </VaultGate>
+  );
+}
+
+function SettingsInner() {
   const router = useRouter();
   const account = useAccount(false); // 설정은 온보딩 화면 겸용 — noProfile이어도 여기 머문다
   const [isFirst, setIsFirst] = useState(true);
@@ -87,7 +97,11 @@ export default function SettingsPage() {
   const [goal, setGoal] = useState(0);
   const [companyMin, setCompanyMin] = useState(0);
   const [optIn, setOptIn] = useState(false); // 익명 집계 — 기본 OFF
-  const [emailOptIn, setEmailOptIn] = useState(false); // 메일 수신 — 가입 시 선택값을 계정에서 로드
+  // 이메일 구독 — 계정과 분리된 시스템 (2026-08-14). 이메일만으로 등록하며 계정과 묶지 않는다.
+  const [subEmail, setSubEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [subBusy, setSubBusy] = useState(false);
+  const [subMsg, setSubMsg] = useState('');
 
   useEffect(() => {
     if (account.status === 'loading') return;
@@ -117,7 +131,14 @@ export default function SettingsPage() {
       setCompanyMin(existing.companyMinimum);
       setOptIn(existing.optInAnonymousStats);
     }
-    setEmailOptIn(account.emailOptIn);
+    // 구독 상태 조회 — 편의상 계정 이메일을 기본값으로 채우지만 시스템적으로는 무관하다
+    if (account.email) {
+      setSubEmail(account.email);
+      fetch(`/api/notify/subscribe?email=${encodeURIComponent(account.email)}`)
+        .then((r) => r.json())
+        .then((j) => setSubscribed(Boolean(j.subscribed)))
+        .catch(() => {});
+    }
     setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account.status]);
@@ -141,7 +162,7 @@ export default function SettingsPage() {
 
   async function save() {
     const now = new Date().toISOString();
-    const existing = account.profile ?? loadProfile();
+    const existing = account.profile;
     const profile: AgentProfile = {
       avgCommission3m: avgCommission,
       cashOnHand: cash,
@@ -159,8 +180,7 @@ export default function SettingsPage() {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
-    // 계정에 저장 (프로필 + 수신 동의) — 로컬은 캐시로만
-    await pushProfile(profile, emailOptIn);
+    await pushProfile(profile); // 서버가 단일 출처 — 평문 로컬 캐시 없음 (금고 도입)
     router.push('/dashboard');
   }
 
@@ -371,15 +391,55 @@ export default function SettingsPage() {
           </span>
         </label>
         <div className="mt-4 space-y-2 rounded-lg border border-slate-200 p-3">
-          <p className="text-sm font-medium text-slate-700">오늘의 접점 메일 받기</p>
+          <p className="text-sm font-medium text-slate-700">오늘의 접점 메일 구독</p>
           <p className="text-xs text-slate-500">
-            매일 오전 10시, <b>{account.email}</b>로 오늘 가볼 접점 상위 5곳을 보냅니다. 접점 정보만 발송되며
-            계약·금액 데이터는 포함되지 않습니다.
+            매일 오전 10시, 선택한 지역({findRegion(sigungu)?.sigungu.name ?? sigungu})의 오늘 가볼 접점 상위 5곳을
+            보냅니다. 접점 정보만 발송되며 계약·금액 데이터는 포함되지 않습니다. <b>구독은 계정과 분리된 시스템</b>이라
+            로그인 없이도 이메일만으로 등록·해제됩니다.
           </p>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={emailOptIn} onChange={(e) => setEmailOptIn(e.target.checked)} />
-            수신에 동의합니다 (메일 하단 링크로 언제든 해제)
-          </label>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={subEmail}
+              onChange={(e) => setSubEmail(e.target.value)}
+              placeholder="받을 이메일"
+              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <button
+              onClick={async () => {
+                setSubBusy(true);
+                setSubMsg('');
+                try {
+                  if (subscribed) {
+                    await fetch(`/api/notify/unsubscribe?email=${encodeURIComponent(subEmail)}`);
+                    setSubscribed(false);
+                    setSubMsg('구독이 해제되었습니다.');
+                  } else {
+                    const r = await fetch('/api/notify/subscribe', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: subEmail, region: sigungu }),
+                    });
+                    const j = await r.json();
+                    if (r.ok) {
+                      setSubscribed(true);
+                      setSubMsg('구독되었습니다. 메일 하단 링크로 언제든 해제할 수 있습니다.');
+                    } else {
+                      setSubMsg(j.message ?? '등록 실패');
+                    }
+                  }
+                } catch {
+                  setSubMsg('네트워크 오류');
+                }
+                setSubBusy(false);
+              }}
+              disabled={subBusy || !subEmail}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300 ${subscribed ? 'bg-slate-500' : 'bg-[#3182F6]'}`}
+            >
+              {subscribed ? '구독 해제' : '구독'}
+            </button>
+          </div>
+          {subMsg && <p className="text-xs text-slate-500">{subMsg}</p>}
         </div>
         <div className="mt-3 flex items-center gap-4">
           <button onClick={handleLogout} className="text-sm text-slate-500 underline hover:text-slate-700">

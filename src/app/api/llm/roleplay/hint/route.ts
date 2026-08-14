@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const email = verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!email) return Response.json({ status: 'error', message: '로그인이 필요합니다' }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ status: 'disabled' });
-  if (!checkRate(`hint:${email}`, HINTS_PER_DAY)) return Response.json({ status: 'error', message: '힌트 한도 초과' }, { status: 429 });
+  if (!(await checkRate(`hint:${email}`, HINTS_PER_DAY))) return Response.json({ status: 'error', message: '힌트 한도 초과' }, { status: 429 });
 
   try {
     const { region, placeId, history = [] } = (await req.json()) as {

@@ -26,7 +26,7 @@ import {
 } from '@/config/roleplay';
 import type { ScenarioContext } from '@/lib/llm/types';
 
-const TURNS_PER_DAY = 200; // 세션(계정)당 일일 턴 상한 [미검증 가설]
+const TURNS_PER_DAY = 30; // 계정(JWT)당 일일 상한 — 2026-08-14 지시 "30회/일", Redis 카운트 (≈세션 2~3회 분량)
 
 const DIFFICULTY_BRIEF: Record<Difficulty, string> = {
   easy: '너는 보험에 관심이 있지만 정보가 부족하다. 궁금한 것을 물어보고, 상대가 쉽게 설명하면 호의적으로 반응한다.',
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const email = verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!email) return new Response('unauthorized', { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return new Response('__DISABLED__\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-  if (!checkRate(`roleplay:${email}`, TURNS_PER_DAY)) return new Response('__RATELIMIT__\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  if (!(await checkRate(`roleplay:${email}`, TURNS_PER_DAY))) return new Response('__RATELIMIT__\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 
   const body = (await req.json()) as {
     region?: string;

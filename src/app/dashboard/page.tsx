@@ -9,7 +9,8 @@ import Link from 'next/link';
 import { useAccount } from '@/lib/account';
 import { assessBusinessRisk, assessRisk, DRIVER_LABEL, isBusinessRiskHigh, RISK_LEVEL_LABEL } from '@/lib/risk';
 import { calcCashflow, monthsHeld } from '@/lib/cashflow';
-import { loadContracts } from '@/lib/storage';
+import { loadVaultContracts } from '@/lib/vault';
+import VaultGate from '@/components/VaultGate';
 import { man } from '@/lib/format';
 import { regionLabel } from '@/data/regions';
 import { fetchRegionRegistry, findPack, type RegionRegistry } from '@/lib/region-registry';
@@ -31,7 +32,16 @@ const LEVEL_STYLE = {
   low: 'bg-emerald-100 text-emerald-700',
 } as const;
 
+/** 금고 게이트 — 잠기면 Inner가 언마운트되어 메모리의 금액 상태(계약·계산 결과)가 해제된다 */
 export default function DashboardPage() {
+  return (
+    <VaultGate>
+      <DashboardInner />
+    </VaultGate>
+  );
+}
+
+function DashboardInner() {
   const { status, profile } = useAccount(); // guest→/login, 온보딩 전→/settings 자동 이동
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [registry, setRegistry] = useState<RegionRegistry>({ updatedAt: '', regions: [] });
@@ -40,7 +50,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (status !== 'ready' || !profile) return;
-    setContracts(loadContracts());
+    void loadVaultContracts().then(setContracts); // 금고 열림 상태에서만 렌더되므로 복호화 가능
     (async () => {
       const reg = await fetchRegionRegistry();
       setRegistry(reg);

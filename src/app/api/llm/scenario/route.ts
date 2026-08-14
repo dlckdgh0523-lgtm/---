@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const email = verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!email) return Response.json({ status: 'error', message: '로그인이 필요합니다' } satisfies ScenarioLookup, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ status: 'disabled' } satisfies ScenarioLookup);
-  if (!checkRate(`scenario:${email}`, RATE_LIMIT)) {
+  if (!(await checkRate(`scenario:${email}`, RATE_LIMIT))) {
     return Response.json({ status: 'error', message: '오늘 생성 한도에 도달했습니다. 내일 다시 시도하세요.' } satisfies ScenarioLookup, { status: 429 });
   }
 

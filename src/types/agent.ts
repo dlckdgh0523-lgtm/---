@@ -76,10 +76,6 @@ export interface AgentProfile {
   };
   /** 익명 집계 전송 동의 — 기본 false (옵트인) */
   optInAnonymousStats: boolean;
-  /** 오늘의 접점 메일 수신 이메일 (선택) — 서버 구독 저장소와 별개로 프리필용 로컬 보관 */
-  notifyEmail?: string;
-  /** 메일 수신 동의 — 기본 false (옵트인). 켜면 /api/notify/subscribe로 서버 등록 */
-  emailOptIn?: boolean;
   createdAt: string;
   updatedAt: string;
 }

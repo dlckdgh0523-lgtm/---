@@ -6,7 +6,7 @@
 import { NextRequest } from 'next/server';
 import { send } from '@/lib/notify';
 import { buildPayload } from '@/lib/notify/build';
-import { listNotifyRecipients } from '@/lib/server/users';
+import { listSubscribers } from '@/lib/server/subscribers';
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, message: 'unauthorized' }, { status: 401 });
   }
   const dry = req.nextUrl.searchParams.get('dry') === '1';
-  const subscribers = await listNotifyRecipients(); // 사용자 테이블에서 수신 동의 + 지역 보유자만
+  const subscribers = await listSubscribers(); // 계정과 분리된 구독 저장소 (2026-08-14)
   const results: { email: string; region: string; ok: boolean; message?: string }[] = [];
   for (const sub of subscribers) {
     const payload = buildPayload(sub.region, sub.email);

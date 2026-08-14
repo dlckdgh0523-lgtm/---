@@ -1,9 +1,14 @@
 'use client';
 
-/** 로그인 */
+/**
+ * 로그인 — 원문 비밀번호는 브라우저를 벗어나지 않는다.
+ * 클라이언트가 PBKDF2로 authProof(서버 검증용)를 파생해 전송하고,
+ * 성공 시 같은 비밀번호에서 별도 salt로 금고 키를 파생해 금고를 함께 연다.
+ */
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { deriveAuthProof, openVaultWithPassword } from '@/lib/vault';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,16 +21,18 @@ export default function LoginPage() {
     setBusy(true);
     setError('');
     try {
+      const authProof = await deriveAuthProof(email, password); // 원문 대신 파생 해시만 전송
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, authProof }),
       });
       const json = await res.json();
       if (!res.ok) {
         setError(json.message ?? '로그인에 실패했습니다.');
         return;
       }
+      await openVaultWithPassword(email, password); // 같은 비밀번호로 금고 자동 열림 (키는 로컬에만)
       router.push('/dashboard');
     } catch {
       setError('네트워크 오류 — 다시 시도하세요.');

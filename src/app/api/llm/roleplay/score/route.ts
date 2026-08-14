@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   const email = verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!email) return Response.json({ status: 'error', message: '로그인이 필요합니다' } satisfies ScoreResult, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ status: 'disabled' } satisfies ScoreResult);
-  if (!checkRate(`score:${email}`, SCORES_PER_DAY)) {
+  if (!(await checkRate(`score:${email}`, SCORES_PER_DAY))) {
     return Response.json({ status: 'error', message: '오늘 채점 한도에 도달했습니다' } satisfies ScoreResult, { status: 429 });
   }
 

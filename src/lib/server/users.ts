@@ -1,59 +1,43 @@
 /**
- * 사용자 테이블 — 서버 전용. 저장 백엔드 2종:
+ * 사용자 테이블 — 서버 전용.
  *
- * - Redis (Upstash REST): KV_REST_API_URL/KV_REST_API_TOKEN 또는
- *   UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN이 있으면 사용.
- *   Vercel 서버리스는 파일시스템이 읽기 전용이라 배포에서는 이것이 유일한 저장 수단이다.
- *   (2026-08-14 판단 변경: 배포에서 회원가입 400 재현 — 파일 쓰기가 서버리스에서 throw.
- *    /tmp 폴백은 함수 인스턴스 간 비공유라 시연 중 세션 유실 위험이 있어 기각, Redis 채택.)
- * - 파일 (data/users.json, gitignore 대상): 로컬 개발 폴백. Redis 환경변수 없으면 사용.
+ * 저장 항목은 이메일, 인증 해시(authProof의 scrypt), salt, 프로필, 생성/수정 시각뿐이다.
+ * 이름 등 추가 개인정보는 받지 않는다 (2026-08-14 지시).
  *
- * ⚠️ 판단 변경 (2026-08-13, 사용자 지시): 계정 도입과 함께 프로필(보유현금 포함)을 서버에 저장한다.
- *    Phase 0의 "금액은 로컬만" 원칙의 예외 — 크로스 기기 사용을 위한 명시적 결정 (MEMORY.md).
- *    계약(계약자별 금액)은 여전히 브라우저 로컬에만 있다.
- * 비밀번호는 scrypt 해시 + 사용자별 salt. 평문 저장 금지.
+ * ⚠️ 인증 구조 (2026-08-14 확정 — README §로그인/금고):
+ *   서버는 원문 비밀번호를 절대 받지 않는다. 클라이언트가 PBKDF2로 파생한
+ *   "인증용 증명(authProof)"만 전송되고, 서버는 그것을 다시 scrypt로 해시해 저장한다.
+ *   같은 비밀번호에서 별도 salt로 파생되는 "금고 키(vault key)"는 클라이언트를
+ *   벗어나지 않는다 — 서버 코드 어디에도 원문 비밀번호와 금고 키가 존재할 수 없다.
+ *
+ * 저장 백엔드:
+ * - Redis (Upstash REST): 환경변수 있으면 사용. Vercel 서버리스는 파일시스템이
+ *   읽기 전용이라 배포에서는 이것이 유일한 저장 수단 (2026-08-14 결정, MEMORY).
+ * - 파일 (data/users.json, gitignore): 로컬 개발 폴백.
+ *
+ * ⚠️ 판단 변경 (2026-08-13, 사용자 지시): 프로필(보유현금 포함)은 크로스 기기용으로
+ *   서버 저장 유지. 계약(계약자별 금액)은 브라우저 로컬(금고 암호화)에만 있다.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { redisAvailable, redisCommand } from '@/lib/server/redis';
 import type { AgentProfile } from '@/types';
 
 export interface UserRecord {
   email: string;
-  passwordHash: string;
+  authHash: string; // scrypt(authProof, salt) — authProof는 클라이언트가 PBKDF2로 파생한 64자 hex
   salt: string;
-  emailOptIn: boolean; // 오늘의 접점 메일 수신 동의 — 가입 시 선택, 기본 false
   profile: AgentProfile | null; // 온보딩 완료 전 null
   createdAt: string;
   updatedAt: string;
 }
 
-// ---------- 저장 백엔드 ----------
-
 const FILE = path.join(process.cwd(), 'data', 'users.json');
-const REDIS_KEY = 'ifc:users';
-
-function redisEnv(): { url: string; token: string } | null {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-  return url && token ? { url, token } : null;
-}
-
-async function redisCommand(cmd: string[]): Promise<unknown> {
-  const env = redisEnv();
-  if (!env) throw new Error('redis env missing');
-  const res = await fetch(env.url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) throw new Error(`redis ${res.status}`);
-  return ((await res.json()) as { result: unknown }).result;
-}
+const REDIS_KEY = 'ifc:users:v2'; // v2 — authProof 방식 전환으로 구계정 전면 폐기 (2026-08-14)
 
 async function load(): Promise<UserRecord[]> {
-  if (redisEnv()) {
+  if (redisAvailable()) {
     const raw = (await redisCommand(['GET', REDIS_KEY])) as string | null;
     return raw ? (JSON.parse(raw) as UserRecord[]) : [];
   }
@@ -65,7 +49,7 @@ async function load(): Promise<UserRecord[]> {
 }
 
 async function save(list: UserRecord[]): Promise<void> {
-  if (redisEnv()) {
+  if (redisAvailable()) {
     await redisCommand(['SET', REDIS_KEY, JSON.stringify(list)]);
     return;
   }
@@ -73,17 +57,20 @@ async function save(list: UserRecord[]): Promise<void> {
   fs.writeFileSync(FILE, JSON.stringify(list, null, 2));
 }
 
-// ---------- 도메인 로직 ----------
+function hash(authProof: string, salt: string): string {
+  return crypto.scryptSync(authProof, salt, 64).toString('hex');
+}
 
-function hash(password: string, salt: string): string {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
+/** authProof 형태 검증 — PBKDF2-SHA256 256비트 hex. 원문 비밀번호가 오면 여기서 걸러진다. */
+export function isValidAuthProof(v: unknown): v is string {
+  return typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 }
 
 export async function findUser(email: string): Promise<UserRecord | null> {
   return (await load()).find((u) => u.email === email.toLowerCase()) ?? null;
 }
 
-export async function createUser(email: string, password: string, emailOptIn: boolean): Promise<UserRecord | null> {
+export async function createUser(email: string, authProof: string): Promise<UserRecord | null> {
   const normalized = email.toLowerCase();
   const list = await load();
   if (list.some((u) => u.email === normalized)) return null; // 중복
@@ -91,9 +78,8 @@ export async function createUser(email: string, password: string, emailOptIn: bo
   const now = new Date().toISOString();
   const user: UserRecord = {
     email: normalized,
-    passwordHash: hash(password, salt),
+    authHash: hash(authProof, salt),
     salt,
-    emailOptIn,
     profile: null,
     createdAt: now,
     updatedAt: now,
@@ -103,30 +89,19 @@ export async function createUser(email: string, password: string, emailOptIn: bo
   return user;
 }
 
-export async function verifyPassword(email: string, password: string): Promise<UserRecord | null> {
+export async function verifyAuthProof(email: string, authProof: string): Promise<UserRecord | null> {
   const user = await findUser(email);
   if (!user) return null;
-  const candidate = hash(password, user.salt);
-  return crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(user.passwordHash)) ? user : null;
+  const candidate = hash(authProof, user.salt);
+  return crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(user.authHash)) ? user : null;
 }
 
-export async function updateUser(
-  email: string,
-  patch: { profile?: AgentProfile; emailOptIn?: boolean },
-): Promise<UserRecord | null> {
+export async function updateUser(email: string, patch: { profile?: AgentProfile }): Promise<UserRecord | null> {
   const list = await load();
   const user = list.find((u) => u.email === email.toLowerCase());
   if (!user) return null;
   if (patch.profile !== undefined) user.profile = patch.profile;
-  if (patch.emailOptIn !== undefined) user.emailOptIn = patch.emailOptIn;
   user.updatedAt = new Date().toISOString();
   await save(list);
   return user;
-}
-
-/** 발송 대상: 수신 동의 + 온보딩(지역) 완료 사용자 */
-export async function listNotifyRecipients(): Promise<{ email: string; region: string }[]> {
-  return (await load())
-    .filter((u) => u.emailOptIn && u.profile?.region)
-    .map((u) => ({ email: u.email, region: u.profile!.region }));
 }
