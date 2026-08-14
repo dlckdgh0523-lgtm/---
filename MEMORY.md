@@ -109,6 +109,8 @@
 
 - **[2026-08-14] 버그 2건 (사용자 보고: 첫 접근 멘트 오류 + 지도 핀 안 뜸)** — ① **지도 마커 미표시 (코드 버그, 수정)**: 지도 초기화 useEffect(clusterer 생성)가 SDK 로드 후 실행되는데, 마커를 붙이는 필터 useEffect의 dep가 `[filtered]`뿐이라 clusterer 생성 후 재실행되지 않아 `addMarkers`가 한 번도 안 불림 → 커스텀 핀이 로컬·배포 both 처음부터 안 떴음(이전에 본 건 카카오 기본 POI). dep에 `sdkReady` 추가로 수정. 검증: 필터 후 클러스터 숫자 + #3182F6(우선접촉) 색상 SVG 마커 실표시 확인. ② **첫 접근 멘트 ByteString 오류 (배포 환경 문제, 코드 아님)**: 배포 scenario만 500(`index 8 value 8226`=U+2022 •), 로컬은 200 성공. 배포 /api/me(Redis)는 200이라 Redis 정상 → 유일한 차이인 Anthropic 호출의 x-api-key 헤더에 Latin-1 밖 문자. **배포 ANTHROPIC_API_KEY가 Vercel 붙여넣기 중 손상 — 재입력 필요(로컬 키는 정상)**. ③ 이메일: 본문 금액 미포함 코드 검증 + example.com 422 제약 확인, 실발송은 Resend 도메인 미인증이라 계정 소유자 이메일 필요 → 사용자 확인 대기.
 
+- **[2026-08-14] 이메일 실발송 검증 + 지도 핀 개선** — ① 핀: 작은 원(구분 안 됨) → 물방울 핀(28x38, 흰 테두리) 그룹 색상별로 개선, 로컬 실렌더 확인(#F59E0B 등 + 클러스터). ② 이메일 실발송: **onboarding@resend.dev 발신→계정 소유자 gmail 수신 HTTP 200+id 발급(실제 발송)**. 본문 금액 미포함(서버 재검사), 수신해제 배포 실측(구독→해제→subscribed:false), 크론 CRON_SECRET 없이 401 거부 실측. **미완/정직 고지**: (a) 커스텀 도메인 send.mail.jinro.it.kr Resend DNS 미인증→403, 인증 전 계정 이메일로만 발송 가능(지시의 "다른 주소 발송"은 도메인 인증 필요). (b) NEXT_PUBLIC_APP_URL이 .com 오타(실제 .app)라 메일 링크 깨짐—사용자 수정 필요. (c) delivered 상태는 send-only 키라 API 조회 불가, Dashboard/수신함 확인. ③ 부수 수정: NOTIFY_EMAIL_FROM 이중 래핑(이름<메일> 형태 재래핑) 422 → fromHeader로 정규화. ④ 배포 실발송 트리거용 /api/admin/test-email 추가(admin JWT). **README "인증 완료로 갱신" 지시 있었으나 실제 도메인 미인증이라 정직하게 현재 상태(계정이메일 발송만 검증)로 기록 — 검증 안 된 것을 완료로 쓰지 않음.**
+
 ---
 
 ## 폐기된 접근과 폐기 이유

@@ -236,8 +236,20 @@ Settings → Environment Variables에 넣고 Redeploy. **생성**해야 하는 �
 | `ANTHROPIC_API_KEY` | console.anthropic.com | 선택 | 시나리오·롤플레잉·채점·힌트 "키 대기 중" |
 | `NEXT_PUBLIC_KAKAO_MAP_KEY` | developers.kakao.com + **콘솔에 배포 도메인 등록** | 지도에 필수 | 지도 빈 영역. 도메인 미등록이면 SDK 거부 |
 | `SEOUL_DATA_API_KEY` | data.seoul.go.kr | 선택 | `/outreach` 실시간 데이터 비활성 |
-| `RESEND_API_KEY` | resend.com | 선택 | 메일 발송 스킵. 도메인 인증 전엔 발신 `onboarding@resend.dev` 고정 + 계정 소유자 본인만 수신 |
-| `NOTIFY_EMAIL_FROM` | Resend 도메인 인증 후 주소 | 선택 | 미설정 시 `onboarding@resend.dev` |
+| `RESEND_API_KEY` | resend.com | 선택 | 메일 발송 스킵. 도메인 인증 전엔 발신 `onboarding@resend.dev` 고정 + 계정 소유자 본인만 수신 (실측 §이메일 검증) |
+| `NOTIFY_EMAIL_FROM` | Resend 도메인 인증 후 주소 (`이름 <메일>` 또는 `메일`) | 선택 | 미설정 시 `onboarding@resend.dev`. 미인증 도메인을 넣으면 403 |
+
+### 이메일 발송 — 실측 검증 (2026-08-14)
+
+| 항목 | 결과 |
+|---|---|
+| 실발송 | ✅ `onboarding@resend.dev` 발신 → 계정 소유자 이메일 수신 **HTTP 200, 메시지 id 발급**. Resend가 실제로 수락·발송 |
+| 본문 금액 데이터 | ✅ 없음 — 접점 정보(사업장명·주소·경과·업종 폐업률%)만. 서버가 발송 직전 금액 패턴 재검사 |
+| 수신 해제 링크 | ✅ 배포에서 구독 등록(subscribed:true) → 해제(200) → subscribed:false 실측 |
+| 크론 인증 | ✅ `/api/notify/daily`를 CRON_SECRET 없이 호출 시 **401 거부** (배포 실측) |
+| **커스텀 도메인 발송** | ⚠️ **미완** — `NOTIFY_EMAIL_FROM`에 넣은 도메인이 Resend에서 DNS 인증(SPF/DKIM)되지 않아 **403**. 인증 전에는 계정 소유자 이메일로만 발송 가능 |
+| **메일 링크 도메인** | ⚠️ `NEXT_PUBLIC_APP_URL`을 배포 도메인(`https://…vercel.app`)으로 정확히 설정해야 링크가 맞는다. 오타 시 링크가 깨진다 |
+| delivered 상태 | send-only API 키라 상태 조회(GET) 불가 — Resend Dashboard Logs / 수신함에서 확인 |
 | `BUILDING_HUB_API_KEY` | apis.data.go.kr (건축HUB) | 선택 | 상세 패널 건축물대장만 "조회 불가" |
 | `CRON_SECRET` | 생성: `openssl rand -base64 32` | 선택(권장) | 발송 엔드포인트 무인증 노출 |
 | `NEXT_PUBLIC_APP_URL` | 배포 도메인 | 선택 | 메일 링크가 localhost 기준 |
