@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import HeaderNav from '@/components/HeaderNav';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,14 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-bold tracking-tight">
               인톡 <span className="font-normal text-slate-400">|</span> 이창호 사전과제
             </Link>
-            <nav className="flex items-center gap-4 text-sm text-slate-600">
-              <Link href="/dashboard" className="hover:text-[#3182F6]">대시보드</Link>
-              <Link href="/places" className="hover:text-[#3182F6]">접점 지도</Link>
-              <Link href="/outreach" className="hover:text-[#3182F6]">홍보 포인트</Link>
-              <Link href="/contracts" className="hover:text-[#3182F6]">계약</Link>
-              <Link href="/insights" className="hover:text-[#3182F6]">인사이트</Link>
-              <Link href="/settings" className="hover:text-[#3182F6]">설정</Link>
-            </nav>
+            <HeaderNav />
           </div>
         </header>
 

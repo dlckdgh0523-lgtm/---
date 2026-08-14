@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import { findUser, updateUser } from '@/lib/server/users';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
+import { isAdminEmail } from '@/lib/server/admin';
 import { PROFILE_MONEY_FIELDS, type StoredProfile } from '@/types';
 
 function authedEmail(req: NextRequest): string | null {
@@ -17,7 +18,8 @@ export async function GET(req: NextRequest) {
   if (!email) return Response.json({ ok: false }, { status: 401 });
   const user = await findUser(email);
   if (!user) return Response.json({ ok: false }, { status: 401 });
-  return Response.json({ ok: true, email: user.email, profile: user.profile });
+  // isAdmin: 헤더에 관리자 링크를 조건부 노출하기 위한 플래그 (권한 판정 자체는 각 admin 라우트가 재확인)
+  return Response.json({ ok: true, email: user.email, profile: user.profile, isAdmin: isAdminEmail(email) });
 }
 
 export async function PUT(req: NextRequest) {
