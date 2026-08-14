@@ -40,6 +40,7 @@ interface Overview {
     lastNotifyRun: { at: string; total: number; okCount: number; dry: boolean } | null;
   };
   facts: AdminFacts;
+  cross: Cross;
 }
 
 interface AdminFacts {
@@ -66,6 +67,34 @@ interface AdminFacts {
     minSample: number;
   };
   quality: { jestSuites: number; jestCases: number; jestPassing: boolean; ci: string; dockerVerified: boolean; note: string };
+}
+
+interface Dist {
+  n: number;
+  blocked: boolean;
+  masked: boolean;
+  median: number | null;
+  q1: number | null;
+  q3: number | null;
+  min: number | null;
+  max: number | null;
+}
+interface ClawCP {
+  n: number;
+  blocked: boolean;
+  masked: boolean;
+  checkpoints: Record<string, number | null>;
+}
+interface Cross {
+  kAnonMin: number;
+  minSample: number;
+  advanceByTier: Record<string, Dist>;
+  clawbackByTier: Record<string, ClawCP>;
+  productByTier: Record<string, Record<string, number | null>>;
+  clawbackByProduct: Record<string, ClawCP>;
+  minimumByTier: Record<string, { n: number; blocked: boolean; withMinimum: number | null }>;
+  totalStructure: number;
+  totalContract: number;
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -95,6 +124,11 @@ const SAMPLE_ADVANCE_DIST = [
   { range: '70~80%', count: 14 },
   { range: '80~90%', count: 4 },
 ];
+
+/** 비율(0~1)을 % 문자열로. null은 '—'. 환수율은 1.0=100% */
+function pct(v: number | null | undefined): string {
+  return v == null ? '—' : `${Math.round(v * 100)}%`;
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -358,6 +392,118 @@ export default function AdminPage() {
             표본 {data.facts.analysis.minSample}건 미만 마스킹 업종:{' '}
             <b>{data.facts.analysis.maskedBelowSample}개</b>
             <span className="text-xs text-slate-400"> (전부 30건 이상이라 마스킹 없음)</span>
+          </p>
+        </div>
+      </Section>
+
+      {/* 8) 구조 데이터 교차 분석 — 제품이 축적하려는 핵심 데이터 */}
+      <Section title="구조 데이터 교차 분석 (제품 축적 데이터)">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">
+            소속 구조 레코드 {data.cross.totalStructure}건 · 계약 {data.cross.totalContract}건 ·{' '}
+            k-익명성 {data.cross.kAnonMin}건 미만 셀 차단 · {data.cross.minSample}건 미만 표본 부족
+          </p>
+          <div className="flex gap-2">
+            <a href="/api/admin/export?format=csv" className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">CSV 내보내기</a>
+            <a href="/api/admin/export?format=json" className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">JSON 내보내기</a>
+          </div>
+        </div>
+
+        <div className="space-y-4 text-sm">
+          {/* 1) 소속 × 선지급률 */}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">① 소속 구분 × 선지급률 분포</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-xs">
+                <thead><tr className="border-b border-slate-200 text-left text-slate-400"><th className="py-1">소속</th><th>표본</th><th>중앙값</th><th>Q1~Q3</th><th>최소~최대</th></tr></thead>
+                <tbody>
+                  {Object.entries(data.cross.advanceByTier).map(([tier, d]) => (
+                    <tr key={tier} className="border-b border-slate-100 text-slate-600">
+                      <td className="py-1 font-medium">{TIER_LABEL[tier] ?? tier}</td>
+                      <td>{d.n}</td>
+                      {d.blocked ? (
+                        <td colSpan={3} className="text-amber-600">표본 부족(k-익명성 차단, {d.n}/{data.cross.kAnonMin})</td>
+                      ) : d.masked ? (
+                        <td colSpan={3} className="text-amber-600">표본 부족({d.n}/{data.cross.minSample}) — 참고: 중앙값 {pct(d.median)}</td>
+                      ) : (
+                        <>
+                          <td className="font-semibold">{pct(d.median)}</td>
+                          <td>{pct(d.q1)}~{pct(d.q3)}</td>
+                          <td>{pct(d.min)}~{pct(d.max)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 2) 소속 × 환수 구간 — 핵심 */}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">② 소속 구분 × 환수 구간 <span className="rounded bg-[#E8F3FF] px-1.5 py-0.5 text-[10px] text-[#3182F6]">이 제품이 축적하려는 핵심 데이터 — 공개되지 않은 회사별 환수 조건</span></p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[380px] text-xs">
+                <thead><tr className="border-b border-slate-200 text-left text-slate-400"><th className="py-1">소속</th><th>표본</th><th>6개월</th><th>12개월</th><th>24개월</th></tr></thead>
+                <tbody>
+                  {Object.entries(data.cross.clawbackByTier).map(([tier, c]) => (
+                    <tr key={tier} className="border-b border-slate-100 text-slate-600">
+                      <td className="py-1 font-medium">{TIER_LABEL[tier] ?? tier}</td>
+                      <td>{c.n}</td>
+                      {c.blocked ? (
+                        <td colSpan={3} className="text-amber-600">표본 부족({c.n}/{data.cross.kAnonMin})</td>
+                      ) : (
+                        <>
+                          <td>{pct(c.checkpoints['6'])}</td>
+                          <td>{pct(c.checkpoints['12'])}</td>
+                          <td>{pct(c.checkpoints['24'])}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 3) 소속 × 상품 */}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">③ 소속 구분 × 주력 상품</p>
+            {Object.entries(data.cross.productByTier).map(([tier, prods]) => {
+              const cells = Object.entries(prods).filter(([, v]) => v !== null);
+              return (
+                <p key={tier} className="text-xs text-slate-600">
+                  {TIER_LABEL[tier] ?? tier}: {cells.length ? cells.map(([p, v]) => `${PRODUCT_LABEL[p] ?? p} ${v}건`).join(' · ') : <span className="text-slate-400">표본 부족 또는 없음</span>}
+                </p>
+              );
+            })}
+          </div>
+
+          {/* 4) 상품 × 환수 */}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">④ 상품 구분 × 환수 조건</p>
+            {Object.keys(data.cross.clawbackByProduct).length === 0 && <p className="text-xs text-slate-400">수집된 레코드 없음</p>}
+            {Object.entries(data.cross.clawbackByProduct).map(([prod, c]) => (
+              <p key={prod} className="text-xs text-slate-600">
+                {PRODUCT_LABEL[prod] ?? prod}: 표본 {c.n}건 — {c.blocked ? <span className="text-amber-600">표본 부족({c.n}/{data.cross.kAnonMin})</span> : `6개월 ${pct(c.checkpoints['6'])} · 12개월 ${pct(c.checkpoints['12'])} · 24개월 ${pct(c.checkpoints['24'])}`}
+              </p>
+            ))}
+          </div>
+
+          {/* 5) 최소치 유무 × 소속 */}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">⑤ 회사 권장 최소치 존재 여부 × 소속 <span className="text-[10px] text-slate-400">(목표 압박이 어느 구분에 집중되는지)</span></p>
+            {Object.entries(data.cross.minimumByTier).map(([tier, m]) => (
+              <p key={tier} className="text-xs text-slate-600">
+                {TIER_LABEL[tier] ?? tier}: {m.blocked ? <span className="text-amber-600">표본 부족({m.n}/{data.cross.kAnonMin})</span> : `${m.withMinimum}/${m.n}명이 최소치 있음`}
+              </p>
+            ))}
+          </div>
+
+          <p className="border-t border-slate-200 pt-2 text-[10px] leading-relaxed text-slate-400">
+            ⚠️ 골든셋은 개발자 1인이 작성했고 현업 검증을 받지 않았습니다. 케이스 수가 적어 통계적 신뢰도가 낮습니다.
+            교차 필터를 좁히면 개인이 특정될 수 있어, 셀 표본이 {data.cross.kAnonMin}건 미만이면 수치를 차단합니다(k-익명성).
+            내보내기는 집계값만 포함하며 개별 레코드·이메일은 나가지 않습니다.
           </p>
         </div>
       </Section>

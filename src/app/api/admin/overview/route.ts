@@ -12,7 +12,7 @@ import { listUserProfiles } from '@/lib/server/users';
 import { listSubscribers } from '@/lib/server/subscribers';
 import { readNotifyRun } from '@/lib/server/ops';
 import { readLlmMetrics } from '@/lib/llm/metrics';
-import { contractRiskDistribution, structureSummary } from '@/lib/server/stats';
+import { contractRiskDistribution, crossAnalysis, structureSummary } from '@/lib/server/stats';
 import { loadAdminFacts } from '@/lib/server/admin-facts';
 import { DAILY_LIMITS } from '@/config/roleplay';
 
@@ -73,5 +73,7 @@ export async function GET(req: NextRequest) {
     },
     // 실사용자 0명이어도 0이 아닌 실측 사실 — 파이프라인·품질·분석·QA (2026-08-14)
     facts: loadAdminFacts(),
+    // 구조 데이터 교차 분석 (소속×선지급률/환수/상품, k-익명성 적용) — 제품 축적 데이터
+    cross: await crossAnalysis(),
   });
 }
