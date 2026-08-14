@@ -13,6 +13,7 @@ import { listSubscribers } from '@/lib/server/subscribers';
 import { readNotifyRun } from '@/lib/server/ops';
 import { readLlmMetrics } from '@/lib/llm/metrics';
 import { contractRiskDistribution, structureSummary } from '@/lib/server/stats';
+import { loadAdminFacts } from '@/lib/server/admin-facts';
 import { DAILY_LIMITS } from '@/config/roleplay';
 
 /** 표본 30건 미만이면 수치 미노출 — 인사이트 화면과 동일 원칙 (라우트 export 제약상 비공개 상수) */
@@ -70,5 +71,7 @@ export async function GET(req: NextRequest) {
       regions,
       lastNotifyRun: await readNotifyRun(),
     },
+    // 실사용자 0명이어도 0이 아닌 실측 사실 — 파이프라인·품질·분석·QA (2026-08-14)
+    facts: loadAdminFacts(),
   });
 }

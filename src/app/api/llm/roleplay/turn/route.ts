@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
         const finalMsg = await stream.finalMessage();
         if (finalMsg.stop_reason === 'refusal') {
           controller.enqueue(encoder.encode('__ERROR__\n'));
-          void recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
+          await recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
         } else {
           flushSentences(true);
           if (buffer.trim()) {
@@ -168,11 +168,11 @@ export async function POST(req: NextRequest) {
             if (guarded.ok && guarded.text) controller.enqueue(encoder.encode(guarded.text + '\n'));
           }
           if (ended) controller.enqueue(encoder.encode('__END__\n'));
-          void recordLlmCall('roleplay-turn', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
+          await recordLlmCall('roleplay-turn', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
         }
       } catch {
         controller.enqueue(encoder.encode('__ERROR__\n'));
-        void recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
+        await recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
       } finally {
         controller.close();
       }

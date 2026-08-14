@@ -106,17 +106,17 @@ export async function POST(req: NextRequest) {
       .slice(0, 3);
 
     if (scenarios.length === 0) {
-      void recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
+      await recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
       return Response.json({ status: 'error', message: '필터를 통과한 문장이 없습니다. 다시 시도하세요.' } satisfies ScenarioLookup);
     }
-    void recordLlmCall('scenario', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
+    await recordLlmCall('scenario', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
     return Response.json({
       status: 'ok',
       scenarios,
       note: 'AI 생성 문구입니다 — 사실 여부를 확인하고 본인 말투로 다듬어 쓰세요.',
     } satisfies ScenarioLookup);
   } catch (e) {
-    void recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
+    await recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
     return Response.json(
       { status: 'error', message: e instanceof Error ? e.message : 'unknown' } satisfies ScenarioLookup,
       { status: 500 },

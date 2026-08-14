@@ -39,6 +39,33 @@ interface Overview {
     regions: { code: string; name: string; recordCount: number; builtAt: string }[];
     lastNotifyRun: { at: string; total: number; okCount: number; dry: boolean } | null;
   };
+  facts: AdminFacts;
+}
+
+interface AdminFacts {
+  pipeline: {
+    regions: { code: string; name: string; recordCount: number; builtAt: string; distribution: Record<string, number> }[];
+    baseScan: { scanned: number; inRegion: number; open: number; noCoord: number } | null;
+    datasets: { file: string; encoding: string; crs: string }[];
+  };
+  dataQuality: {
+    coordCrs: string;
+    crsHitRate: Record<string, string>;
+    coordMissing: number;
+    joinMatchRate: number;
+    joinNote: string;
+    crsMedianError: string;
+    relicenseSuspectPct: number;
+    relicenseNote: string;
+  };
+  analysis: {
+    survivalSample: { total: number; closed: number; open: number } | null;
+    industryGapPct: number | null;
+    industryRange: { low: string; lowSurv: number; high: string; highSurv: number } | null;
+    maskedBelowSample: number;
+    minSample: number;
+  };
+  quality: { jestSuites: number; jestCases: number; jestPassing: boolean; ci: string; dockerVerified: boolean; note: string };
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -121,28 +148,37 @@ export default function AdminPage() {
             <p className="mb-1 font-semibold text-slate-700">
               소속 형태별 선지급률 (익명 구조 레코드 — 직접 입력값만, 계정 조인 불가)
             </p>
-            {Object.entries(aggregates.structure).length === 0 && <p className="text-slate-400">수집된 레코드 없음</p>}
-            {Object.entries(aggregates.structure).map(([tier, s]) => (
-              <p key={tier} className="text-slate-600">
-                {TIER_LABEL[tier] ?? tier}: 표본 {s.n}건 —{' '}
-                {s.reliable && s.advanceRateMedian != null ? (
-                  <>중앙값 {Math.round(s.advanceRateMedian * 100)}% <span className="text-emerald-600">(신규 사용자 프리셋에 반영 중)</span></>
-                ) : (
-                  <span className="text-amber-600">표본 부족 (&lt;{minSample}건, 수치 미노출 — 공통 예시값 사용 중)</span>
-                )}
-              </p>
-            ))}
-            <div className="mt-2 rounded-lg bg-[#F9FAFB] p-3">
-              <p className="mb-1 text-xs font-bold text-red-500">샘플 — 실데이터 아님 (표본 {minSample}건 도달 시 실분포로 대체)</p>
-              <div className="flex items-end gap-2">
-                {SAMPLE_ADVANCE_DIST.map((b) => (
-                  <div key={b.range} className="flex flex-col items-center gap-1">
-                    <div className="w-10 rounded-t bg-slate-300" style={{ height: `${b.count * 3}px` }} />
-                    <span className="text-[10px] text-slate-400">{b.range}</span>
+            {/* 실데이터가 1건이라도 있으면 실측값을 보인다. 샘플 막대는 0건일 때만.
+                이유: 실측값 1건이 라벨링된 가짜 분포보다 정보량이 크다 (2026-08-14 지시). */}
+            {Object.entries(aggregates.structure).length > 0 ? (
+              Object.entries(aggregates.structure).map(([tier, s]) => (
+                <p key={tier} className="text-slate-600">
+                  {TIER_LABEL[tier] ?? tier}: 표본 {s.n}건 —{' '}
+                  {s.reliable && s.advanceRateMedian != null ? (
+                    <>중앙값 {Math.round(s.advanceRateMedian * 100)}% <span className="text-emerald-600">(신규 사용자 프리셋에 반영 중)</span></>
+                  ) : (
+                    <span className="text-amber-600">
+                      {Math.round((s.advanceRates.reduce((a, b) => a + b, 0) / (s.advanceRates.length || 1)) * 100)}% (표본 {s.n}건, {minSample}건 미만이라 프리셋 미적용)
+                    </span>
+                  )}
+                </p>
+              ))
+            ) : (
+              <>
+                <p className="text-slate-400">아직 수집된 실데이터 없음 — 아래는 UI 형태 예시입니다.</p>
+                <div className="mt-2 rounded-lg bg-[#F9FAFB] p-3">
+                  <p className="mb-1 text-xs font-bold text-red-500">샘플 — 실데이터 아님 (실데이터가 1건이라도 들어오면 이 막대는 사라지고 실측값이 표시됩니다)</p>
+                  <div className="flex items-end gap-2">
+                    {SAMPLE_ADVANCE_DIST.map((b) => (
+                      <div key={b.range} className="flex flex-col items-center gap-1">
+                        <div className="w-10 rounded-t bg-slate-300" style={{ height: `${b.count * 3}px` }} />
+                        <span className="text-[10px] text-slate-400">{b.range}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </div>
           <div>
             <p className="mb-1 font-semibold text-slate-700">환수 구간 직접 설정 사용자</p>
@@ -258,9 +294,88 @@ export default function AdminPage() {
         </div>
       </Section>
 
+      {/* 4) 데이터 파이프라인 현황 — 실측 (실사용자 0명이어도 0이 아님) */}
+      <Section title="데이터 파이프라인 현황 (실측)">
+        <div className="space-y-3 text-sm text-slate-600">
+          {data.facts.pipeline.baseScan && (
+            <p>
+              기준 지역(용산) 원본 스캔: <b>{data.facts.pipeline.baseScan.scanned.toLocaleString()}행</b> 스캔 →
+              지역 내 {data.facts.pipeline.baseScan.inRegion.toLocaleString()} → 영업중 {data.facts.pipeline.baseScan.open.toLocaleString()} →
+              좌표 결측 {data.facts.pipeline.baseScan.noCoord}건 제외
+            </p>
+          )}
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">지역별 레코드 · 빌드 시각 · 경과 구간 분포</p>
+            {data.facts.pipeline.regions.map((r) => (
+              <div key={r.code} className="mb-1.5">
+                <p>
+                  <b>{r.name}</b> — {r.recordCount.toLocaleString()}건 · 빌드 {r.builtAt.slice(0, 16).replace('T', ' ')}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {Object.entries(r.distribution).map(([k, v]) => `${k.split('(')[0]} ${v.toLocaleString()}`).join(' · ')}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">원본 데이터셋 ({data.facts.pipeline.datasets.length}종)</p>
+            <p className="text-xs text-slate-400">
+              {data.facts.pipeline.datasets.map((d) => d.file.replace('_서울특별시.csv', '')).join(', ')} · 인코딩 CP949 · 좌표계 {data.facts.pipeline.datasets[0]?.crs}
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* 5) 데이터 품질 지표 — 실측 */}
+      <Section title="데이터 품질 지표 (실측)">
+        <div className="space-y-1.5 text-sm text-slate-600">
+          <p>조인 매칭률: <b>{Math.round(data.facts.dataQuality.joinMatchRate * 1000) / 10}%</b> <span className="text-xs text-slate-400">— {data.facts.dataQuality.joinNote}</span></p>
+          <p>재인허가 의심: <b>{Math.round(data.facts.dataQuality.relicenseSuspectPct * 1000) / 10}%</b> <span className="text-xs text-slate-400">— {data.facts.dataQuality.relicenseNote}</span></p>
+          <p>좌표 결측 제외: <b>{data.facts.dataQuality.coordMissing}건</b></p>
+          <p>
+            좌표계 판별: <b>{data.facts.dataQuality.coordCrs}</b> 확정
+            <span className="text-xs text-slate-400"> — bbox로는 {Object.entries(data.facts.dataQuality.crsHitRate).map(([k, v]) => `${k} ${v}`).join(', ')}로 구분 불가 → {data.facts.dataQuality.crsMedianError}</span>
+          </p>
+        </div>
+      </Section>
+
+      {/* 6) 분석 결과 요약 — 실측 */}
+      <Section title="분석 결과 요약 (실측)">
+        <div className="space-y-1.5 text-sm text-slate-600">
+          {data.facts.analysis.survivalSample && (
+            <p>
+              생존 분석 표본: <b>{data.facts.analysis.survivalSample.total.toLocaleString()}건</b>
+              <span className="text-xs text-slate-400"> (폐업 {data.facts.analysis.survivalSample.closed.toLocaleString()} 사건 / 영업 {data.facts.analysis.survivalSample.open.toLocaleString()} 중도절단)</span>
+            </p>
+          )}
+          {data.facts.analysis.industryGapPct != null && data.facts.analysis.industryRange && (
+            <p>
+              업종별 24개월 생존율 격차: <b>{data.facts.analysis.industryGapPct}%p</b>
+              <span className="text-xs text-slate-400"> ({data.facts.analysis.industryRange.low} {data.facts.analysis.industryRange.lowSurv}% ~ {data.facts.analysis.industryRange.high} {data.facts.analysis.industryRange.highSurv}%)</span>
+            </p>
+          )}
+          <p>
+            표본 {data.facts.analysis.minSample}건 미만 마스킹 업종:{' '}
+            <b>{data.facts.analysis.maskedBelowSample}개</b>
+            <span className="text-xs text-slate-400"> (전부 30건 이상이라 마스킹 없음)</span>
+          </p>
+        </div>
+      </Section>
+
+      {/* 7) 품질 보증 — 실측 */}
+      <Section title="품질 보증 (실측)">
+        <div className="space-y-1.5 text-sm text-slate-600">
+          <p>Jest: <b>{data.facts.quality.jestSuites}스위트 {data.facts.quality.jestCases}케이스</b> {data.facts.quality.jestPassing ? <span className="text-emerald-600">전원 통과</span> : <span className="text-red-600">실패</span>}</p>
+          <p>CI: <span className="text-xs">{data.facts.quality.ci}</span></p>
+          <p>Docker 이미지 빌드·산출물 대조: {data.facts.quality.dockerVerified ? <span className="text-emerald-600">검증됨</span> : <span className="text-slate-400">미검증</span>}</p>
+          <p className="text-xs text-slate-400">{data.facts.quality.note}</p>
+        </div>
+      </Section>
+
       <p className="text-xs text-slate-400">
         이 화면은 개인 식별값을 표시하지 않습니다 — 이메일·금액 원본·계약 상세는 서버 API가 반환하지 않으며, 프로필
-        금액은 클라이언트 암호화라 서버(관리자 포함)가 열 수 없습니다.
+        금액은 클라이언트 암호화라 서버(관리자 포함)가 열 수 없습니다. 상단 익명 집계·LLM 운영은 실사용에 따라
+        채워지고, 아래 파이프라인·품질·분석·QA는 실사용자 0명이어도 시스템이 실제로 처리한 실측값입니다.
       </p>
     </div>
   );

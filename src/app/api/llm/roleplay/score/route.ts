@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
     const hintPenalty = Math.min(hintCount * HINT_PENALTY, HINT_PENALTY_CAP);
     const score = Math.max(0, base - hintPenalty);
 
-    void recordLlmCall('roleplay-score', { ok: true, latencyMs: Date.now() - startedAt, retries: retryCount });
+    await recordLlmCall('roleplay-score', { ok: true, latencyMs: Date.now() - startedAt, retries: retryCount });
     return Response.json({
       status: 'ok',
       score,
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
       lowReliability: recognitionFailRate >= RECOGNITION_FAIL_WARN_RATE,
     } satisfies ScoreResult);
   } catch (e) {
-    void recordLlmCall('roleplay-score', { ok: false, latencyMs: 0 });
+    await recordLlmCall('roleplay-score', { ok: false, latencyMs: 0 });
     return Response.json({ status: 'error', message: e instanceof Error ? e.message : 'unknown' } satisfies ScoreResult, { status: 500 });
   }
 }

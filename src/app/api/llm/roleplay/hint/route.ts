@@ -60,14 +60,14 @@ export async function POST(req: NextRequest) {
     if (!block || block.type !== 'text') return Response.json({ status: 'error', message: '파싱 실패' });
     const guarded = (JSON.parse(block.text) as { candidates: string[] }).candidates.map((c) => guardLlmOutput(c));
     const candidates = guarded.filter((g) => g.ok).map((g) => g.text).slice(0, 3);
-    void recordLlmCall('hint', {
+    await recordLlmCall('hint', {
       ok: candidates.length > 0,
       latencyMs: Date.now() - startedAt,
       guardViolations: guarded.flatMap((g) => g.violations),
     });
     return Response.json({ status: 'ok', candidates });
   } catch (e) {
-    void recordLlmCall('hint', { ok: false, latencyMs: Date.now() - startedAt });
+    await recordLlmCall('hint', { ok: false, latencyMs: Date.now() - startedAt });
     return Response.json({ status: 'error', message: e instanceof Error ? e.message : 'unknown' }, { status: 500 });
   }
 }
