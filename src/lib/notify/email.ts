@@ -11,17 +11,25 @@
 import { renderHtml, renderSubject, renderText } from './render';
 import type { ChannelAdapter, NotifyPayload, SendResult } from './types';
 
+/** From 헤더 정규화 — 이메일만이면 표시 이름을 붙이고, 이미 "이름 <메일>" 형태면 그대로 쓴다. */
+export function fromHeader(raw: string | undefined): string {
+  if (!raw) return '인톡 사전과제 <onboarding@resend.dev>';
+  return raw.includes('<') ? raw : `인톡 사전과제 <${raw}>`;
+}
+
 export const emailAdapter: ChannelAdapter = {
   async send(payload: NotifyPayload, to: string): Promise<SendResult> {
     const key = process.env.RESEND_API_KEY;
     if (!key) return { ok: false, message: 'RESEND_API_KEY 미설정 — 발송 보류' };
-    const from = process.env.NOTIFY_EMAIL_FROM ?? 'onboarding@resend.dev'; // 도메인 인증 후 교체 지점
+    // NOTIFY_EMAIL_FROM은 이메일만("no-reply@x.com") 또는 이름 포함("이름 <no-reply@x.com>") 둘 다 허용.
+    // 이미 <>가 있으면 그대로 쓰고(이중 래핑 방지), 이메일만이면 표시 이름을 붙인다.
+    const from = fromHeader(process.env.NOTIFY_EMAIL_FROM);
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: `인톡 사전과제 <${from}>`,
+          from,
           to: [to],
           subject: renderSubject(payload),
           html: renderHtml(payload),

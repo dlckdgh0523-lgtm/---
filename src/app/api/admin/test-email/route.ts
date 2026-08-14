@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { isAdminEmail } from '@/lib/server/admin';
 import { buildPayload } from '@/lib/notify/build';
+import { fromHeader } from '@/lib/notify/email';
 import { renderHtml, renderSubject, renderText } from '@/lib/notify/render';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,13 +25,13 @@ export async function POST(req: NextRequest) {
   const payload = buildPayload(region, to);
   if (!payload) return Response.json({ ok: false, message: '지역 팩 없음 또는 오늘 접점 0건' }, { status: 400 });
 
-  const from = process.env.NOTIFY_EMAIL_FROM ?? 'onboarding@resend.dev';
+  const from = fromHeader(process.env.NOTIFY_EMAIL_FROM);
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: `인톡 사전과제 <${from}>`,
+        from,
         to: [to],
         subject: renderSubject(payload),
         html: renderHtml(payload),
