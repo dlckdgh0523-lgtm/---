@@ -1,0 +1,32 @@
+# CI — 회귀 방지. 세 검사가 모두 통과해야 초록.
+# 무료 티어(ubuntu-latest, 공개 저장소는 무제한 / 사설도 월 2,000분) 범위 안에서 구성.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Jest
+        run: npm test
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 파이프라인 이미지가 빌드되는지만 확인 (원본 CSV는 저장소에 없어 실행은 하지 않는다)
+      - name: Build pipeline image
+        run: docker build -t ifc-pipeline .

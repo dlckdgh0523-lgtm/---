@@ -132,7 +132,15 @@ SIGUNGU=11680 docker compose run --rm build-region # 다른 지역
 docker compose run --rm build-survival             # 생존 분석 재계산
 ```
 
-원본 CSV(로그인 기반 수동 다운로드)만 마운트하면 지역 데이터 팩이 재현 생성된다. 앱 서빙 컨테이너가 아니다 — 앱은 Vercel이 담당하고, Docker의 역할은 파이프라인 재현성이다. ⚠️ 정직 고지: 작성 환경에 Docker가 없어 이미지 빌드는 미검증이다 (Dockerfile은 표준 구성).
+원본 CSV(로그인 기반 수동 다운로드)만 마운트하면 지역 데이터 팩이 재현 생성된다. 앱 서빙 컨테이너가 아니다 — 앱은 Vercel이 담당하고, Docker의 역할은 파이프라인 재현성이다.
+
+**실검증 완료 (2026-08-14)**: 이미지 빌드 성공(node:24-alpine, 약 41초), CSV를 격리된 출력 디렉터리에 마운트해 컨테이너 안에서 파이프라인 끝까지 실행, 산출물을 로컬 실행 결과와 대조 — **레코드 7,113건 일치, 좌표 범위(위도 37.5080~37.5549 / 경도 126.9452~127.0142) 일치, 사업장 ID 집합 차이 0건**. 빌드 중 만난 문제: Git Bash의 `$(pwd)`가 한글 포함 경로에서 볼륨 마운트를 깨뜨려(`/app/data/raw` ENOENT) PowerShell 절대 경로로 전환해 해결. (미검증으로 남는 부분: 이 검증은 로컬 Docker Desktop 기준이며, CI(GitHub Actions)에서의 이미지 빌드는 아래 워크플로로 별도 확인한다.)
+
+## CI (GitHub Actions)
+
+`.github/workflows/ci.yml` — main push·PR마다 세 검사가 모두 통과해야 초록:
+1. `tsc --noEmit` (타입) 2. `npm test` (Jest 66건) 3. `docker build` (파이프라인 이미지 빌드 — 원본 CSV는 저장소에 없어 빌드만, 실행은 안 함).
+ubuntu-latest 무료 티어 범위. 이로써 "로컬에서만 되고 배포/CI에서 깨지는" 회귀(앞서 gitignore·서버리스 FS로 두 번 겪음)를 push 시점에 잡는다.
 
 ## 기술 스택 — 채택/기각 근거
 
@@ -141,7 +149,7 @@ docker compose run --rm build-survival             # 생존 분석 재계산
 | 항목 | 판단 | 기술적 이유 |
 |---|---|---|
 | Jest | ✅ 채택 | 결정론적 계산 로직이 핵심 가치라 단위 테스트의 효용이 실제로 큼 |
-| Docker | ✅ 채택 (파이프라인 한정) | CSV→팩 변환의 환경 독립 재현. 앱 컨테이너화는 Vercel과 중복이라 제외 |
+| Docker | ✅ 채택 (파이프라인 한정) | CSV→팩 변환의 환경 독립 재현. 앱 컨테이너화는 Vercel과 중복이라 제외. 이미지 빌드+컨테이너 실행 실검증 완료 (산출물 로컬과 동일) |
 | MLOps 모니터링 | ✅ 자체 구현 | 호출량이 작아 외부 도구(LangSmith 등) 없이 Redis 카운터로 충분 |
 | AWS 이전 | ❌ 기각 | Vercel에서 정상 동작 중 — 이전할 기술적 이유가 없다 |
 | Airflow | ❌ 기각 | 데이터 규모(용산구 7,113건, 단일 배치)에 오케스트레이터는 과잉 |
@@ -149,19 +157,25 @@ docker compose run --rm build-survival             # 생존 분석 재계산
 | PostgreSQL/MongoDB | ❌ 기각 | 현재 Redis(계정·구독·리밋·메트릭)로 충분, 스키마 DB는 복잡도만 추가 |
 | Python 파이프라인 포팅 | ❌ 보류 | 검증된 TS 파이프라인을 대체할 기술적 이유 없음 — 시간이 남으면 검토 |
 
-## 배포 체크리스트 (Vercel)
+## 배포 체크리스트 (Vercel) — 평가자용 재현 가이드
 
-| 항목 | 없으면 어떻게 되나 (graceful degradation) |
-|---|---|
-| **Upstash Redis 연결** (Storage 탭 → 자동으로 KV_REST_API_URL/TOKEN 주입) | ⚠️ **회원가입이 503으로 실패** (서버리스 파일시스템은 읽기 전용). 구독·리밋·메트릭도 인스턴스별로 흩어짐 |
-| `SESSION_SECRET` | 개발용 기본키로 JWT 서명 — **프로덕션 보안상 필수** |
-| `ANTHROPIC_API_KEY` | 시나리오·롤플레잉·채점·힌트가 "키 대기 중" 안내로 비활성 (화면은 죽지 않음) |
-| `NEXT_PUBLIC_KAKAO_MAP_KEY` + **카카오 콘솔에 배포 도메인 등록** (앱 설정>앱>플랫폼 키>JavaScript 키) | 접점 지도가 빈 영역 + 안내 문구. 키가 있어도 도메인 미등록이면 SDK가 거부(AccessDeniedError) |
-| `SEOUL_DATA_API_KEY` | /outreach 실시간 혼잡도·행사가 "키 대기 중"으로 비활성 |
-| `RESEND_API_KEY` | 메일 발송 스킵 (cron은 돌지만 발송 없음). 도메인 인증 전엔 수신자 제한 |
-| `ADMIN_EMAILS` | /admin이 모두에게 404 (관리자 기능 전체 비활성) |
-| `BUILDING_HUB_API_KEY` | 상세 패널의 건축물대장 정보만 "조회 불가" 표시 |
-| `CRON_SECRET` (선택) | 발송 엔드포인트가 인증 없이 노출 — 설정 권장 |
+Vercel → 프로젝트 → Settings → Environment Variables에 아래를 넣고 Redeploy. 발급이 아니라 **생성**해야 하는 값은 생성 명령을 함께 적었다.
+
+| 변수 | 발급처 / 생성 방법 | 필수 | 없을 때 degrade되는 화면 |
+|---|---|---|---|
+| `KV_REST_API_URL` + `KV_REST_API_TOKEN` | Vercel → Storage 탭 → Upstash Redis 생성·연결 시 **자동 주입** (또는 Upstash 콘솔의 REST URL/Token) | **필수** | **회원가입·로그인 전체 실패(503)** — 서버리스 FS는 읽기 전용. 구독·레이트리밋·LLM 메트릭·익명 통계도 유실. 로그인 불가 → 대시보드·지도·계약 등 로그인 화면 전부 도달 불가 |
+| `SESSION_SECRET` | **생성**: `openssl rand -base64 32` | **필수(프로덕션)** | 개발용 기본키로 JWT 서명 → 누구나 세션 위조 가능. 기능은 동작하나 보안 결격 |
+| `ADMIN_EMAILS` | 직접 지정 (쉼표 구분 이메일) | 관리자 기능에 필수 | `/admin`이 모두에게 404 |
+| `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys | 선택 | 접근 시나리오·롤플레잉·채점·힌트가 "키 대기 중"으로 비활성 (앱은 정상) |
+| `NEXT_PUBLIC_KAKAO_MAP_KEY` | developers.kakao.com → 앱 → 앱 키 (JavaScript) + **콘솔에 배포 도메인 등록** (앱 설정>앱>플랫폼 키>JavaScript 키) | 지도에 필수 | 접점 지도가 빈 영역 + 안내. 키가 있어도 **도메인 미등록이면 SDK가 AccessDeniedError로 거부** |
+| `SEOUL_DATA_API_KEY` | data.seoul.go.kr → 실시간 도시데이터 인증키 | 선택 | `/outreach` 실시간 혼잡도·연령·행사가 "키 대기 중" 비활성 |
+| `RESEND_API_KEY` | resend.com → API Keys | 선택 | 오늘의 접점 메일 발송 스킵 (cron은 돌지만 발송 0). 도메인 인증 전엔 발신 `onboarding@resend.dev` 고정 + 계정 소유자 본인에게만 수신 |
+| `NOTIFY_EMAIL_FROM` | Resend 도메인 인증 후 발신 주소 | 선택 | 미설정 시 `onboarding@resend.dev`로 발송 |
+| `BUILDING_HUB_API_KEY` | 국토부 건축HUB (apis.data.go.kr) | 선택 | 접점 상세 패널의 건축물대장 정보만 "조회 불가" |
+| `CRON_SECRET` | **생성**: `openssl rand -base64 32` | 선택(권장) | 발송 엔드포인트가 인증 없이 노출 — Vercel Cron 헤더 검증용 |
+| `NEXT_PUBLIC_APP_URL` | 배포 도메인 (예: `https://sales-changho.vercel.app`) | 선택 | 메일 링크가 `http://localhost:3000` 기준이 됨 |
+
+**최소 동작 조건**: `KV_REST_API_URL`+`KV_REST_API_TOKEN`+`SESSION_SECRET`만 있으면 가입·로그인·계산기·접점 리스트가 동작한다. 지도는 `NEXT_PUBLIC_KAKAO_MAP_KEY`+도메인 등록, 관리자는 `ADMIN_EMAILS`, AI 기능은 `ANTHROPIC_API_KEY`가 추가로 필요하다.
 
 ## 실행 (로컬)
 
