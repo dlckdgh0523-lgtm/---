@@ -35,9 +35,19 @@ export type ElapsedStage =
  * src/data/needs-map.ts(Phase 3)에 구조만 만들고 값은 TODO로 비워 사용자에게 요청한다.
  */
 export interface NeedTag {
-  code: string;        // 예: 'fire', 'liability' — 체계는 사용자 확정 대기
+  code: string;        // 예: 'fire', 'liability'
   label: string;       // 화면 표시명 (한국어)
-  rationale?: string;  // 왜 이 업종에 이 니즈인가 — 사용자 작성
+  /**
+   * 근거의 성격 (2026-08-14):
+   *   'statutory' — 법령상 가입 의무. statuteRef에 근거 법령 기재.
+   *   'general'   — 업종 특성상 통상 검토되는 항목 (법정 의무 아님, 검증 필요).
+   * ⚠️ 이 구분은 법령·공개자료 조사에 기반한 것이며 작성자의 현장 영업 경험이 아니다.
+   */
+  basis: 'statutory' | 'general';
+  /** 층·면적 등 조건에 따라 대상 여부가 갈림 — 관할 소방서 확인 필요 (음식점 계열) */
+  conditional?: boolean;
+  statuteRef?: string; // 예: '다중이용업소법 제13조의2 및 시행령 제2조'
+  rationale?: string;
 }
 
 /** places.json에 저장되는 원본 레코드. 폐업 사업장은 파이프라인에서 이미 제외됨. */

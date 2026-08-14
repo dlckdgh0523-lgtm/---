@@ -433,22 +433,49 @@ export default function PlacesPage() {
               )}
             </div>
 
-            {/* 추정 보장 니즈 — 사업/개인 분리 (상품 구조 재정의) */}
+            {/* 보장 니즈 — 법정 의무(statutory)와 일반 검토(general) 구분. 법령·공개자료 조사 기반(현장 경험 아님) */}
             <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700">추정 보장 니즈</p>
+              <p className="font-semibold text-slate-700">보장 니즈</p>
               {selectedNeeds && (selectedNeeds.business.length > 0 || selectedNeeds.personalContext.length > 0) ? (
-                <div className="mt-1 space-y-1.5">
+                <div className="mt-1.5 space-y-2">
                   <div>
-                    <p className="text-slate-400">사업 보장 (진입 명분)</p>
-                    <p>{selectedNeeds.business.map((n) => n.label).join(', ') || '—'}</p>
+                    <p className="mb-1 text-slate-400">사업 보장 (진입 명분)</p>
+                    <ul className="space-y-1">
+                      {selectedNeeds.business.map((n) => (
+                        <li key={n.code}>
+                          <span className={n.basis === 'statutory' ? 'font-semibold text-red-600' : ''}>
+                            {n.basis === 'statutory' && '⚖️ '}
+                            {n.label}
+                          </span>
+                          {n.basis === 'statutory' && (
+                            <span className="ml-1 rounded bg-red-100 px-1 py-0.5 text-[10px] font-medium text-red-700">법정 의무</span>
+                          )}
+                          {n.rationale && <span className="ml-1 text-slate-400">· {n.rationale}</span>}
+                          {n.statuteRef && <span className="block text-[10px] text-slate-400">근거: {n.statuteRef} · 미가입 시 최대 300만원 과태료</span>}
+                          {n.conditional && (
+                            <span className="block text-[10px] text-amber-600">※ 층·면적 조건에 따라 대상 여부가 달라지므로 관할 소방서 확인 필요</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   <div>
-                    <p className="text-slate-400">개인 보장 진입 맥락</p>
+                    <p className="mb-1 text-slate-400">개인 보장 진입 맥락</p>
                     <p>{selectedNeeds.personalContext.map((n) => n.label).join(', ') || '—'}</p>
                   </div>
+                  {selectedNeeds.employeeGroup && selectedNeeds.employeeGroup.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-slate-400">직원 있는 경우</p>
+                      <p>{selectedNeeds.employeeGroup.map((n) => n.label).join(', ')}</p>
+                    </div>
+                  )}
+                  <p className="border-t border-slate-200 pt-1.5 text-[10px] text-slate-400">
+                    ⚖️ 법정 의무 항목은 법령·공개자료 조사 기반이며, 나머지는 업종 특성상 통상 검토되는 항목(검증 필요)입니다.
+                    작성자의 현장 영업 경험이 아닙니다.
+                  </p>
                 </div>
               ) : (
-                <p className="mt-0.5 text-slate-400">업종별 매핑 준비 중 — 보험 실무 검토 후 채워집니다 (추측으로 채우지 않음).</p>
+                <p className="mt-0.5 text-slate-400">이 업종은 매핑 준비 중입니다 (자료가 불확실한 업종은 추측으로 채우지 않음).</p>
               )}
             </div>
           </aside>
