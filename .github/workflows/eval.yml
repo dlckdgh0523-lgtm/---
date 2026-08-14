@@ -1,0 +1,41 @@
+# LLM 회귀 평가 — 수동 트리거만.
+# 매 push마다 돌리지 않는 이유: 실제 Anthropic API를 호출해 비용이 발생하고(케이스 24 × 3회 = 72 호출),
+# 프롬프트/모델을 바꿨을 때만 회귀를 볼 값어치가 있다. Actions 탭에서 "Run workflow"로 수동 실행하거나
+# 'run-eval' 라벨이 붙은 PR에서만 돈다.
+name: LLM Eval (manual)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  eval:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-eval'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Start dev server
+        run: npm run dev &
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      - name: Wait for server + seed test account
+        run: |
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/ >/dev/null && break; sleep 2; done
+          # 테스트 계정 생성 (authProof는 러너와 동일 파생) — 로컬 파일 저장소 사용
+          node -e "const c=require('crypto');const e='enc-check@example.com';const a=c.pbkdf2Sync('encpass99','ifc-auth-v1:'+e,300000,32,'sha256').toString('hex');fetch('http://localhost:3000/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,authProof:a})}).then(r=>console.log('seed',r.status))"
+      - name: Run eval
+        run: npm run eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/results/

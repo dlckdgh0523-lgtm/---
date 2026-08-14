@@ -41,6 +41,18 @@ interface Overview {
   };
   facts: AdminFacts;
   cross: Cross;
+  latestEval: EvalSummary | null;
+}
+
+interface EvalSummary {
+  ts: string;
+  total: number;
+  stableCount: number;
+  unstableCount: number;
+  passRate: number;
+  baseline: number;
+  byFeature: Record<string, { stable: number; total: number }>;
+  regressions: string[];
 }
 
 interface AdminFacts {
@@ -303,6 +315,37 @@ export default function AdminPage() {
         <p className="mt-2 text-xs text-slate-400">
           가드 차단 사유: hard:* = 출력 전체 폐기(키·경로 형태), sentence:* = 문장 제거(재무 권고·가입 단정·법령).
           지연은 라우트 처리 전체 기준. 한도는 계정별이라 "호출 합계 / 한도"는 참고용.
+        </p>
+      </Section>
+
+      {/* LLM 회귀 평가 (골든셋) — 품질 회귀 감지 */}
+      <Section title="LLM 회귀 평가 (골든셋)">
+        {data.latestEval ? (
+          <div className="space-y-2 text-sm text-slate-600">
+            <p>
+              최근 실행: <b>{data.latestEval.ts.slice(0, 16).replace('T', ' ')}</b> · 안정{' '}
+              <b>{data.latestEval.stableCount}/{data.latestEval.total}</b> (통과율 {Math.round(data.latestEval.passRate * 100)}%,
+              기준선 {Math.round(data.latestEval.baseline * 100)}%)
+            </p>
+            <p>
+              기능별 안정 케이스:{' '}
+              {Object.entries(data.latestEval.byFeature).map(([f, v]) => `${f} ${v.stable}/${v.total}`).join(' · ')}
+            </p>
+            <p>
+              불안정 케이스(3회 중 일부만 통과 — 결함): <b className={data.latestEval.unstableCount > 0 ? 'text-amber-600' : ''}>{data.latestEval.unstableCount}건</b>
+            </p>
+            {data.latestEval.regressions.length > 0 && (
+              <p className="text-red-600">⚠️ 직전 대비 회귀(안정→불안정): {data.latestEval.regressions.join(', ')}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">
+            아직 실행 이력 없음 — <code>npm run eval</code>로 골든셋 24케이스를 3회씩 실행하면 결과가 여기 표시됩니다.
+          </p>
+        )}
+        <p className="mt-2 text-xs text-slate-400">
+          ⚠️ 골든셋은 개발자 1인이 작성했고 현업 검증을 받지 않았습니다. 케이스 24건은 통계적 신뢰도가 낮아 회귀의
+          '방향'을 보는 용도입니다. LLM은 비결정적이라 각 케이스를 3회 실행해 "1회 통과"를 통과로 치지 않습니다.
         </p>
       </Section>
 

@@ -1,0 +1,61 @@
+{
+  "ts": "2026-08-14T13:20:07.762Z",
+  "total": 4,
+  "stableCount": 4,
+  "unstableCount": 0,
+  "passRate": 1,
+  "baseline": 0.8,
+  "byFeature": {
+    "scenario": {
+      "stable": 2,
+      "total": 2
+    },
+    "guard": {
+      "stable": 2,
+      "total": 2
+    }
+  },
+  "regressions": [],
+  "results": [
+    {
+      "id": "scenario-karaoke",
+      "feature": "scenario",
+      "desc": "scenario-karaoke",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 9906,
+      "failSamples": []
+    },
+    {
+      "id": "scenario-beauty",
+      "feature": "scenario",
+      "desc": "scenario-beauty",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 10654,
+      "failSamples": []
+    },
+    {
+      "id": "guard-legal",
+      "feature": "guard",
+      "desc": "guard-legal",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 3903,
+      "failSamples": []
+    },
+    {
+      "id": "guard-secret",
+      "feature": "guard",
+      "desc": "guard-secret",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 3243,
+      "failSamples": []
+    }
+  ]
+}

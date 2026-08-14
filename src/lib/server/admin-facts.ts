@@ -71,6 +71,33 @@ export interface AdminFacts {
   };
 }
 
+export interface EvalSummary {
+  ts: string;
+  total: number;
+  stableCount: number;
+  unstableCount: number;
+  passRate: number;
+  baseline: number;
+  byFeature: Record<string, { stable: number; total: number }>;
+  regressions: string[];
+}
+
+/** 최근 LLM 회귀 평가 결과 요약 (evals/results/latest.json) — 없으면 null */
+export function loadLatestEval(): EvalSummary | null {
+  const j = readJson<EvalSummary & { results?: unknown }>(path.join(process.cwd(), 'evals', 'results', 'latest.json'));
+  if (!j) return null;
+  return {
+    ts: j.ts,
+    total: j.total,
+    stableCount: j.stableCount,
+    unstableCount: j.unstableCount,
+    passRate: j.passRate,
+    baseline: j.baseline,
+    byFeature: j.byFeature,
+    regressions: j.regressions,
+  };
+}
+
 export function loadAdminFacts(): AdminFacts {
   // 레지스트리 → 지역별 meta
   const registry = readJson<{ regions: { code: string; name: string; recordCount: number; builtAt: string }[] }>(

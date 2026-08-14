@@ -13,7 +13,7 @@ import { listSubscribers } from '@/lib/server/subscribers';
 import { readNotifyRun } from '@/lib/server/ops';
 import { readLlmMetrics } from '@/lib/llm/metrics';
 import { contractRiskDistribution, crossAnalysis, structureSummary } from '@/lib/server/stats';
-import { loadAdminFacts } from '@/lib/server/admin-facts';
+import { loadAdminFacts, loadLatestEval } from '@/lib/server/admin-facts';
 import { DAILY_LIMITS } from '@/config/roleplay';
 
 /** 표본 30건 미만이면 수치 미노출 — 인사이트 화면과 동일 원칙 (라우트 export 제약상 비공개 상수) */
@@ -75,5 +75,7 @@ export async function GET(req: NextRequest) {
     facts: loadAdminFacts(),
     // 구조 데이터 교차 분석 (소속×선지급률/환수/상품, k-익명성 적용) — 제품 축적 데이터
     cross: await crossAnalysis(),
+    // 최근 LLM 회귀 평가 결과 (없으면 null)
+    latestEval: loadLatestEval(),
   });
 }
