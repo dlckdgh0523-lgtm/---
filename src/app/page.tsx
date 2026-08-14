@@ -180,6 +180,31 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── 더 많은 기능 ── */}
+      <section className="mt-16">
+        <h2 className={`text-center text-2xl font-bold ${INK}`}>두 기능을 잇는 도구들</h2>
+        <p className={`mx-auto mt-2 max-w-xl text-center leading-relaxed ${SUB}`}>
+          접점을 찾고 자금을 점검하는 것에서 끝나지 않습니다. 만나기 전에 연습하고, 만날 이유를 법령으로 확인하고,
+          매일 알림을 받습니다.
+        </p>
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { icon: '🎤', t: '음성 롤플레잉', d: '실제 사업장 데이터로 만든 사장님 페르소나와 방문 상담을 말로 연습합니다. 대화는 LLM이 고정 기준으로 채점하고, 숫자 합산은 코드가 합니다.' },
+            { icon: '🗺️', t: '접점 지도 · 핀 선택', d: '카카오맵 위에 경과 구간별 색상 핀으로 사업장을 표시합니다. 지도를 눌러 활동 지역을 고를 수도 있습니다(역지오코딩).' },
+            { icon: '⚖️', t: '보장 니즈 — 확인', d: '다중이용업소는 화재배상책임보험이 법적 의무입니다. "필요할 것"이 아니라 "가입 의무가 있다"는 사실로 접촉의 성격이 바뀝니다.' },
+            { icon: '✉️', t: '오늘의 접점 메일', d: '매일 오전 오늘 가볼 접점 5곳을 그룹별 접근 팁과 함께 보냅니다. 옵트인 기본 꺼짐, 금액 데이터는 넣지 않습니다.' },
+            { icon: '🔒', t: '금고 — 금액 암호화', d: '수령액·현금은 브라우저에서 비밀번호로 암호화됩니다. 서버도, 관리자도 원본을 볼 수 없습니다. 30분 무활동 시 자동 잠금.' },
+            { icon: '📊', t: '관리자 · MLOps', d: 'LLM 기능별 성공/실패·가드 차단·지연을 집계합니다. AI를 만드는 데서 끝내지 않고 운영·모니터링까지.' },
+          ].map((c) => (
+            <div key={c.t} className="rounded-2xl border border-[#F2F4F6] bg-white p-5">
+              <p className="text-2xl">{c.icon}</p>
+              <p className={`mt-2 font-bold ${INK}`}>{c.t}</p>
+              <p className={`mt-1.5 text-sm leading-relaxed ${SUB}`}>{c.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── 사전과제: 왜 이렇게 만들었나 ── */}
       <section className="mt-20 rounded-3xl bg-[#191F28] p-8 text-white sm:p-10">
         <span className="text-sm font-bold text-[#4E9EFF]">사전과제 노트 — 왜 이렇게 만들었나</span>
@@ -219,6 +244,57 @@ export default function LandingPage() {
           MEMORY 문서에 전부 기록돼 있습니다. 여기 적힌 수치는 금감원 공시·금융위 보도로 교차 확인했거나 실제
           데이터에서 측정한 값입니다.
         </p>
+      </section>
+
+      {/* ── 기술 스택 & 트레이드오프 (사전과제) ── */}
+      <section className="mt-16">
+        <span className="text-sm font-bold text-[#3182F6]">기술 선택과 트레이드오프</span>
+        <h2 className={`mt-2 text-2xl font-bold ${INK}`}>왜 이 스택인가</h2>
+        <p className={`mt-2 leading-relaxed ${SUB}`}>
+          "채용 공고에 있어서"는 기술 선택의 근거가 아닙니다. 각 갈림길에서 무엇을 검토하고 왜 골랐는지, 기각한 것은
+          왜 기각했는지를 기록했습니다. 전체 근거는 저장소 README §3에 있습니다.
+        </p>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs text-[#8B95A1]">
+                <th className="py-2 pr-3">갈림길</th>
+                <th className="py-2 pr-3">검토한 것</th>
+                <th className="py-2">선택 · 이유</th>
+              </tr>
+            </thead>
+            <tbody className={SUB}>
+              {[
+                ['금액 저장', '서버 평문 / 해싱 / 클라 암호화', '클라 AES-GCM — 해싱은 계산 불가, 서버 키 보유는 보안 이득 없음'],
+                ['인증', '계정 없음 / 매직링크 / 비밀번호', 'authProof — 원문 비번이 서버에 안 감. 매직링크는 반복 메일 확인 부담'],
+                ['LLM', '파인튜닝 / 멀티에이전트 / 단일 턴', '단일 턴 툴콜링 — 학습 데이터 0건, 에이전트 그래프 정당화 불가'],
+                ['법령', 'API 연동 / 정규식 / 언급 금지', '언급 금지 — 정규식은 오탐·미탐, 페르소나가 법을 정확히 아는 것도 부자연'],
+                ['알림', '카카오 / 이메일', '이메일(Resend) — 카카오 타인 발송은 검수·반려, 실전달 채널 아님'],
+                ['인프라', 'AWS / Airflow / BigQuery / PG', '전부 기각 — 7,113건 단일 배치에 과잉. Redis로 충분'],
+              ].map(([k, considered, chosen]) => (
+                <tr key={k} className="border-b border-slate-100 align-top">
+                  <td className="py-2.5 pr-3 font-semibold text-[#191F28]">{k}</td>
+                  <td className="py-2.5 pr-3 text-[#8B95A1]">{considered}</td>
+                  <td className="py-2.5">{chosen}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-6">
+          <p className={`text-sm font-semibold ${INK}`}>스택</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {['Next.js 15', 'TypeScript', 'Tailwind v4', 'Upstash Redis', 'Anthropic Claude', '카카오맵 SDK', 'Resend', 'Jest 66건', 'Docker', 'GitHub Actions CI', 'Vercel'].map((s) => (
+              <span key={s} className="rounded-full bg-[#F2F4F6] px-3 py-1 text-xs font-medium text-[#4E5968]">{s}</span>
+            ))}
+          </div>
+          <p className={`mt-3 text-sm leading-relaxed ${SUB}`}>
+            숫자는 전부 결정론적 코드가 만들고, LLM은 해석·문장만 합니다. 계산 로직은 Jest 66건으로 검증했고,
+            데이터 파이프라인은 Docker로 재현하며, 매 배포는 CI(타입·테스트·이미지 빌드)를 통과합니다.
+          </p>
+        </div>
       </section>
 
       {/* ── 마지막 CTA ── */}
