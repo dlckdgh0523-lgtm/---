@@ -13,6 +13,7 @@ import { estimateAdvance, monthsHeld } from '@/lib/cashflow';
 import { loadVaultContracts, saveVaultContracts } from '@/lib/vault';
 import VaultGate from '@/components/VaultGate';
 import { man, pct } from '@/lib/format';
+import { premiumBandOf } from '@/types';
 import type { AgentProfile, Contract, ContractFactors, ProductLine } from '@/types';
 
 const PRODUCT_LABEL: Record<ProductLine, string> = {
@@ -86,6 +87,23 @@ function ContractsInner() {
     const next = [...contracts, contract];
     setContracts(next);
     void saveVaultContracts(next); // AES-GCM 암호문으로만 저장
+    // 익명 구조 레코드 (2026-08-14 수집 정책): 옵트인 시에만. 금액 원본·별칭·계정 정보는 보내지 않는다 —
+    // 보험료는 구간으로, 위험은 등급만. 원본 계약은 위 암호문에만 존재한다.
+    if (profile?.optInAnonymousStats) {
+      void fetch('/api/stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contract: {
+            productLine: product,
+            premiumBand: premiumBandOf(premium),
+            factors: { ...factors },
+            businessCategory: businessCat || null,
+            riskLevel: assessRisk(contract).level,
+          },
+        }),
+      }).catch(() => {});
+    }
     setLabel('');
     setPremium(0);
     setAdvancePaid(0);
@@ -131,6 +149,13 @@ function ContractsInner() {
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="font-bold">계약 추가</h2>
+        {profile.optInAnonymousStats && (
+          <p className="rounded-lg bg-[#F9FAFB] p-2.5 text-xs leading-relaxed text-slate-500">
+            익명 통계 참여 중 — 이 계약의 <b>구조 정보만</b>(상품·보험료 구간·4문항·업종·위험 등급) 익명으로
+            집계됩니다. 별칭·금액 원본은 이 기기의 암호화 저장소에만 남고 계정과 연결되지 않습니다. 설정 F에서
+            끌 수 있습니다.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="mb-1 text-xs text-slate-500">별칭 (실명 입력 금지 — 예: "카페 사장님")</p>

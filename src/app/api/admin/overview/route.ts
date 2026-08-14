@@ -12,6 +12,7 @@ import { listUserProfiles } from '@/lib/server/users';
 import { listSubscribers } from '@/lib/server/subscribers';
 import { readNotifyRun } from '@/lib/server/ops';
 import { readLlmMetrics } from '@/lib/llm/metrics';
+import { contractRiskDistribution, structureSummary } from '@/lib/server/stats';
 import { DAILY_LIMITS } from '@/config/roleplay';
 
 /** 표본 30건 미만이면 수치 미노출 — 인사이트 화면과 동일 원칙 (라우트 export 제약상 비공개 상수) */
@@ -55,10 +56,10 @@ export async function GET(req: NextRequest) {
       optInCount: profiles.length,
       byTier,
       byProduct,
-      // 계약별 위험도는 서버에 존재하지 않는다(클라이언트 암호화) — 수집 자체가 불가함을 명시
-      riskDistribution: null,
-      riskDistributionNote:
-        '계약·위험도 데이터는 클라이언트 암호화 설계상 서버에 없다. 옵트인 익명 이벤트 집계를 도입하기 전까지 수집 불가.',
+      // 익명 구조 레코드 기반 (2026-08-14 수집 정책) — 계약 원본은 여전히 서버에 없고,
+      // 옵트인 사용자의 비식별 구조값(구간·문항·등급)만 별도 레코드로 집계된다
+      riskDistribution: await contractRiskDistribution(),
+      structure: await structureSummary(),
     },
     llm: {
       today: await readLlmMetrics(),

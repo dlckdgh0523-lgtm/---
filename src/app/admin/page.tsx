@@ -14,6 +14,12 @@ interface TierAgg {
   userStructureCount: number;
 }
 
+interface LevelCount {
+  high: number;
+  medium: number;
+  low: number;
+}
+
 interface Overview {
   ok: boolean;
   minSample: number;
@@ -21,8 +27,8 @@ interface Overview {
     optInCount: number;
     byTier: Record<string, TierAgg>;
     byProduct: Record<string, number>;
-    riskDistribution: null;
-    riskDistributionNote: string;
+    riskDistribution: { total: number; byProduct: Record<string, LevelCount>; byIndustry: Record<string, LevelCount> };
+    structure: Record<string, { n: number; reliable: boolean; advanceRateMedian: number | null; advanceRates: number[] }>;
   };
   llm: {
     today: Record<string, { ok: number; fail: number; retries: number; avgLatencyMs: number | null; guardBlocks: Record<string, number> }>;
@@ -112,15 +118,17 @@ export default function AdminPage() {
       <Section title={`익명 집계 — 옵트인 ${aggregates.optInCount}명`}>
         <div className="space-y-4 text-sm">
           <div>
-            <p className="mb-1 font-semibold text-slate-700">소속 형태별 선지급률 분포 (직접 입력값만 — 기본값 제외)</p>
-            {Object.entries(aggregates.byTier).length === 0 && <p className="text-slate-400">데이터 없음</p>}
-            {Object.entries(aggregates.byTier).map(([tier, agg]) => (
+            <p className="mb-1 font-semibold text-slate-700">
+              소속 형태별 선지급률 (익명 구조 레코드 — 직접 입력값만, 계정 조인 불가)
+            </p>
+            {Object.entries(aggregates.structure).length === 0 && <p className="text-slate-400">수집된 레코드 없음</p>}
+            {Object.entries(aggregates.structure).map(([tier, s]) => (
               <p key={tier} className="text-slate-600">
-                {TIER_LABEL[tier] ?? tier}: 표본 {agg.advanceRates.length}건 —{' '}
-                {agg.advanceRates.length >= minSample ? (
-                  `${Math.round((agg.advanceRates.reduce((s, v) => s + v, 0) / agg.advanceRates.length) * 100)}% 평균`
+                {TIER_LABEL[tier] ?? tier}: 표본 {s.n}건 —{' '}
+                {s.reliable && s.advanceRateMedian != null ? (
+                  <>중앙값 {Math.round(s.advanceRateMedian * 100)}% <span className="text-emerald-600">(신규 사용자 프리셋에 반영 중)</span></>
                 ) : (
-                  <span className="text-amber-600">표본 부족 (&lt;{minSample}건, 수치 미노출)</span>
+                  <span className="text-amber-600">표본 부족 (&lt;{minSample}건, 수치 미노출 — 공통 예시값 사용 중)</span>
                 )}
               </p>
             ))}
@@ -153,8 +161,29 @@ export default function AdminPage() {
             </p>
           </div>
           <div>
-            <p className="mb-1 font-semibold text-slate-700">상품 구분별 위험도 분포</p>
-            <p className="text-xs text-slate-500">{aggregates.riskDistributionNote}</p>
+            <p className="mb-1 font-semibold text-slate-700">
+              상품·업종별 위험도 분포 (익명 계약 구조 레코드 {aggregates.riskDistribution.total}건 — 금액·계정 없음)
+            </p>
+            {aggregates.riskDistribution.total === 0 && (
+              <p className="text-slate-400">수집된 레코드 없음 — 옵트인 사용자가 계약을 등록하면 채워집니다</p>
+            )}
+            {Object.entries(aggregates.riskDistribution.byProduct).map(([prod, d]) => (
+              <p key={prod} className="text-slate-600">
+                {PRODUCT_LABEL[prod] ?? prod}: 상 {d.high} · 중 {d.medium} · 하 {d.low}
+              </p>
+            ))}
+            {Object.entries(aggregates.riskDistribution.byIndustry).length > 0 && (
+              <p className="mt-1 text-xs text-slate-500">
+                업종별:{' '}
+                {Object.entries(aggregates.riskDistribution.byIndustry)
+                  .map(([ind, d]) => `${ind}(상${d.high}/중${d.medium}/하${d.low})`)
+                  .join(' · ')}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-slate-400">
+              계약 원본(금액·별칭)은 여전히 서버에 없다 — 클라이언트 암호화 유지. 이 분포는 옵트인 사용자의
+              비식별 구조값(구간·문항·등급)만으로 집계된다.
+            </p>
           </div>
         </div>
       </Section>

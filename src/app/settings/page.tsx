@@ -97,6 +97,8 @@ function SettingsInner() {
   const [goal, setGoal] = useState(0);
   const [companyMin, setCompanyMin] = useState(0);
   const [optIn, setOptIn] = useState(false); // 익명 집계 — 기본 OFF
+  // 소속 구분별 구조 역산 요약 (표본 30건 이상이면 중앙값 프리셋 적용 — 2026-08-14 수집 정책)
+  const [tierSummary, setTierSummary] = useState<Record<string, { n: number; reliable: boolean; advanceRateMedian: number | null; clawbackScheduleMedian: ClawbackBracket[] | null }>>({});
   // 이메일 구독 — 계정과 분리된 시스템 (2026-08-14). 이메일만으로 등록하며 계정과 묶지 않는다.
   const [subEmail, setSubEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -110,6 +112,10 @@ function SettingsInner() {
       return;
     }
     fetchRegionRegistry().then(setRegistry);
+    fetch('/api/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j?.summary && setTierSummary(j.summary))
+      .catch(() => {});
     const existing = account.profile; // 서버가 단일 출처 (계정에 저장된 프로필)
     if (existing) {
       setIsFirst(false);
@@ -151,9 +157,17 @@ function SettingsInner() {
   }, [expenseTouched, suggestedExpense]);
 
   // B(소속) 선택 → C(구조) 프리셋 적용. 사용자가 직접 입력한('user') 값은 덮어쓰지 않는다.
+  // 해당 구분의 익명 표본이 30건 이상이면 실측 중앙값을, 아니면 공통 예시값을 쓴다 (2026-08-14).
   function pickTier(next: AgentProfile['companyTier']) {
     setTier(next);
-    const preset = STRUCTURE_PRESETS[next];
+    const measured = tierSummary[next];
+    const preset =
+      measured?.reliable && measured.advanceRateMedian != null
+        ? {
+            advanceRate: measured.advanceRateMedian,
+            clawbackSchedule: measured.clawbackScheduleMedian ?? STRUCTURE_PRESETS[next].clawbackSchedule,
+          }
+        : STRUCTURE_PRESETS[next];
     if (source.advanceRate === 'default') setAdvanceRate(preset.advanceRate);
     if (source.clawbackSchedule === 'default') setSchedule(preset.clawbackSchedule.map((b) => ({ ...b })));
   }
@@ -181,6 +195,23 @@ function SettingsInner() {
       updatedAt: now,
     };
     await pushProfile(profile); // 서버가 단일 출처 — 평문 로컬 캐시 없음 (금고 도입)
+    // 익명 구조값 전송 (2026-08-14 수집 정책): 옵트인 + 직접 입력('user') 값이 있을 때만.
+    // 비율·구간·유무만 — 금액 원본은 보내지 않는다. 레코드에 계정 정보가 저장되지 않는다.
+    if (optIn && (source.advanceRate === 'user' || source.clawbackSchedule === 'user')) {
+      void fetch('/api/stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          structure: {
+            companyTier: tier,
+            mainProductLine: product,
+            advanceRate: source.advanceRate === 'user' ? advanceRate : undefined,
+            clawbackSchedule: source.clawbackSchedule === 'user' ? schedule : undefined,
+            hasCompanyMinimum: companyMin > 0, // 유무만 — 금액 아님
+          },
+        }),
+      }).catch(() => {});
+    }
     router.push('/dashboard');
   }
 
@@ -276,8 +307,15 @@ function SettingsInner() {
 
       <Section code="B" title="소속 형태" required>
         <p className="mb-2 text-sm text-slate-500">
-          회사명은 받지 않습니다. 이 선택은 C의 기본 프리셋을 결정하도록 설계돼 있지만, <b>현재는 4개 구분의 실측
-          기준 데이터가 없어 모두 같은 예시값이 적용됩니다</b> — 익명 통계가 쌓이면 구분별로 분화됩니다.
+          회사명은 받지 않습니다. 이 선택은 C의 기본 프리셋을 결정합니다.{' '}
+          {tierSummary[tier]?.reliable ? (
+            <b>이 구분은 익명 표본 {tierSummary[tier].n}건의 실측 중앙값이 적용됩니다.</b>
+          ) : (
+            <b>
+              이 구분은 표본 부족({tierSummary[tier]?.n ?? 0}/30건)이라 공통 예시값이 적용됩니다
+            </b>
+          )}{' '}
+          — 사용자들이 직접 입력한 구조값이 쌓일수록 구분별로 분화됩니다.
         </p>
         <div className="grid grid-cols-2 gap-2">
           {TIER_OPTIONS.map((t) => (
@@ -309,6 +347,11 @@ function SettingsInner() {
       </Section>
 
       <Section code="C" title="수수료 구조">
+        <p className="mb-3 rounded-lg bg-[#F9FAFB] p-3 text-xs leading-relaxed text-slate-500">
+          💡 <b>내 조건을 입력하면 같은 소속사 사용자들의 기본값이 정확해집니다.</b> F 섹션의 익명 통계에 동의한
+          경우, 직접 입력한 값에 한해 <b>비율과 구간만</b> 저장되며 계정과 연결되지 않습니다. 금액(수령액·보유
+          현금 등)은 저장 대상이 아닙니다.
+        </p>
         <StructureEditor
           advanceRate={advanceRate}
           schedule={schedule}
@@ -386,8 +429,15 @@ function SettingsInner() {
         <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm">
           <input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} className="mt-0.5" />
           <span className="text-slate-600">
-            익명 통계에 참여합니다 (선택). 소속 형태·상품 구분과 <b>내가 직접 입력한</b> 선지급률·환수 구간 설정만
-            익명으로 집계됩니다. 기본값을 그대로 쓰는 동안에는 구조값이 집계되지 않습니다.
+            익명 통계에 참여합니다 (선택, 기본 꺼짐). <b>내 조건을 입력하면 같은 소속사 사용자들의 기본값이
+            정확해집니다.</b> 저장되는 것: 소속·상품 구분, <b>내가 직접 입력한</b> 선지급률·환수 구간(비율),
+            계약의 구조 정보(보험료 <b>구간</b>·4문항·업종·위험 등급). 저장되지 않는 것: 금액 원본·이메일·계정
+            연결. 기본값을 그대로 쓰는 동안에는 구조값이 집계되지 않습니다.
+            <br />
+            <span className="text-xs text-slate-400">
+              ⚠️ 한계 고지: 익명 레코드는 계정과 연결이 없어, 참여를 끄더라도 <b>이미 저장된 레코드는 개별 삭제가
+              불가능</b>합니다 (누구 것인지 알 수 없기 때문). 끄는 시점부터 새 저장만 중단됩니다.
+            </span>
           </span>
         </label>
         <div className="mt-4 space-y-2 rounded-lg border border-slate-200 p-3">
