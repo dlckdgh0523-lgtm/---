@@ -16,6 +16,7 @@ import { man } from '@/lib/format';
 import { SIDO_LIST, findRegion } from '@/data/regions';
 import { fetchRegionRegistry, findPack, type RegionRegistry } from '@/lib/region-registry';
 import StructureEditor, { SourceBadge } from '@/components/StructureEditor';
+import RegionPicker from '@/components/RegionPicker';
 import type { AgentProfile, Affiliation, ClawbackBracket, ProductLine } from '@/types';
 
 const DEFAULT_SIGUNGU = '11170'; // 서울 용산구 — 초기 선택값일 뿐, 활성 여부는 레지스트리가 결정
@@ -230,6 +231,14 @@ function SettingsInner() {
 
   if (!loaded) return null;
 
+  // 지도 핀으로 지역 선택 → 시/도·시군구를 함께 갱신 (역지오코딩이 준 시군구코드로 역인덱스)
+  function pickRegionByCode(sigunguCode: string) {
+    const found = findRegion(sigunguCode);
+    if (!found) return; // 상가정보 원천에 없는 코드(데이터상 미존재 구) — 무시
+    setSido(found.sido.code);
+    setSigungu(found.sigungu.code);
+  }
+
   const numInput = (value: number, onChange: (n: number) => void) => (
     <input
       type="number"
@@ -302,6 +311,9 @@ function SettingsInner() {
             데이터가 준비되지 않은 지역을 선택하면 접점 리스트가 비어 있게 됩니다. 자금 구조 점검은 지역과 무관하게
             동작합니다.
           </p>
+        </div>
+        <div className="mt-3">
+          <RegionPicker registry={registry} onPick={pickRegionByCode} />
         </div>
       </Section>
 

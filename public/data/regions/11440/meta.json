@@ -1,0 +1,96 @@
+{
+  "sigunguCode": "11440",
+  "name": "서울특별시 마포구",
+  "generatedAt": "2026-08-14T08:01:17.007Z",
+  "recordCount": 12214,
+  "datasets": [
+    {
+      "file": "문화_노래연습장업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "문화_숙박업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "생활_골프연습장업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "생활_골프장_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "생활_당구장업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "생활_미용업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "생활_세탁업_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "식품_일반음식점_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "식품_휴게음식점_서울특별시.csv",
+      "kind": "localdata-license",
+      "encoding": "cp949",
+      "crs": "EPSG:5174"
+    },
+    {
+      "file": "소상공인시장진흥공단_상가(상권)정보_서울_202606.csv",
+      "kind": "sbiz-storefront",
+      "encoding": "utf-8",
+      "기준연월": "2026-06"
+    }
+  ],
+  "stats": {
+    "scanned": 836048,
+    "inRegion": 44275,
+    "open": 12352,
+    "noDate": 0,
+    "noCoord": 138,
+    "outOfBbox": 0,
+    "statusCounts": {
+      "폐업": 31881,
+      "영업/정상": 12352,
+      "취소/말소/만료/정지/중지": 39,
+      "휴업": 3
+    },
+    "sbizCountInRegion": 32102,
+    "coordCrs": "EPSG:5174",
+    "crsHitRate": {
+      "EPSG:5174": "500/500",
+      "EPSG:2097": "500/500"
+    }
+  },
+  "distribution": {
+    "재점검(24~개월)": 9651,
+    "1년차 경과(14~23개월)": 970,
+    "관찰(7~10개월)": 428,
+    "우선 접촉(3~6개월)": 535,
+    "갱신 도래(11~13개월)": 344,
+    "관망(0~2개월)": 286
+  }
+}
