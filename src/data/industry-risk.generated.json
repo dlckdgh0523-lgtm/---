@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-08-13T00:00:00.000Z",
+  "sourceRegion": "11170",
+  "method": "조건부 KM (나이 6개월 → +24개월), Greenwood 95% CI. 표본(atRisk) 30 미만은 reliable=false — 점추정 사용 금지",
+  "avgClosure24": 0.176,
+  "avgClosure24Recent2015": 0.214,
+  "industries": {
+    "노래연습장업": {
+      "closure24": 0.089,
+      "ciLow": 0.049,
+      "ciHigh": 0.129,
+      "atRisk": 193,
+      "reliable": true
+    },
+    "숙박업": {
+      "closure24": 0.026,
+      "ciLow": 0.009,
+      "ciHigh": 0.043,
+      "atRisk": 348,
+      "reliable": true
+    },
+    "골프시설": {
+      "closure24": 0.016,
+      "ciLow": 0,
+      "ciHigh": 0.047,
+      "atRisk": 63,
+      "reliable": true
+    },
+    "당구장업": {
+      "closure24": 0.131,
+      "ciLow": 0.095,
+      "ciHigh": 0.167,
+      "atRisk": 345,
+      "reliable": true
+    },
+    "미용업": {
+      "closure24": 0.157,
+      "ciLow": 0.141,
+      "ciHigh": 0.174,
+      "atRisk": 1995,
+      "reliable": true
+    },
+    "세탁업": {
+      "closure24": 0.094,
+      "ciLow": 0.066,
+      "ciHigh": 0.122,
+      "atRisk": 427,
+      "reliable": true
+    },
+    "일반음식점": {
+      "closure24": 0.175,
+      "ciLow": 0.169,
+      "ciHigh": 0.181,
+      "atRisk": 15454,
+      "reliable": true
+    },
+    "휴게음식점": {
+      "closure24": 0.233,
+      "ciLow": 0.218,
+      "ciHigh": 0.247,
+      "atRisk": 3434,
+      "reliable": true
+    }
+  }
+}

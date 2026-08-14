@@ -5,4 +5,5 @@ out/
 .env.local
 *.tsbuildinfo
 next-env.d.ts
-data/
+# 루트 원본 데이터(대용량 CSV·사용자 계정)만 제외 — src/data, public/data는 커밋 대상
+/data/
