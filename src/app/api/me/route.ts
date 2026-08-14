@@ -14,7 +14,7 @@ function authedEmail(req: NextRequest): string | null {
 export async function GET(req: NextRequest) {
   const email = authedEmail(req);
   if (!email) return Response.json({ ok: false }, { status: 401 });
-  const user = findUser(email);
+  const user = await findUser(email);
   if (!user) return Response.json({ ok: false }, { status: 401 });
   return Response.json({ ok: true, email: user.email, emailOptIn: user.emailOptIn, profile: user.profile });
 }
@@ -24,7 +24,7 @@ export async function PUT(req: NextRequest) {
   if (!email) return Response.json({ ok: false }, { status: 401 });
   try {
     const { profile, emailOptIn } = (await req.json()) as { profile?: AgentProfile; emailOptIn?: boolean };
-    const user = updateUser(email, { profile, emailOptIn });
+    const user = await updateUser(email, { profile, emailOptIn });
     if (!user) return Response.json({ ok: false }, { status: 401 });
     return Response.json({ ok: true });
   } catch {

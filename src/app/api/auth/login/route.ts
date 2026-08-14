@@ -6,7 +6,7 @@ import { sessionCookie, signSession } from '@/lib/server/session';
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = (await req.json()) as { email?: string; password?: string };
-    const user = email && password ? verifyPassword(email, password) : null;
+    const user = email && password ? await verifyPassword(email, password) : null;
     if (!user) return Response.json({ ok: false, message: '이메일 또는 비밀번호가 맞지 않습니다.' }, { status: 401 });
     return Response.json(
       { ok: true, email: user.email },
