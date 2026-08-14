@@ -11,7 +11,7 @@ import { guardLlmOutput } from '@/lib/llm/guard';
 import { recordLlmCall } from '@/lib/llm/metrics';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { loadPlaceContext } from '@/lib/server/place-context';
-import { LLM_MODEL } from '@/config/llm-model';
+import { LLM_MODEL_FAST, outputConfig } from '@/config/llm-model';
 
 const HINTS_PER_DAY = DAILY_LIMITS.hints; // config 단일 출처
 
@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
     const transcript = history.slice(-10).map((h) => `${h.speaker === 'user' ? '설계사' : '사장님'}: ${h.text.slice(0, 300)}`).join('\n');
     const client = new Anthropic();
     const response = await client.messages.create({
-      model: LLM_MODEL,
+      model: LLM_MODEL_FAST, // 짧은 제안, 실시간성 — haiku
       max_tokens: 1024,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
+      output_config: outputConfig(LLM_MODEL_FAST, { effort: 'low', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } }),
       system:
         '너는 보험설계사 방문 상담 코치다. 지금 상황에서 설계사가 할 수 있는 다음 한마디 후보 2~3개를 제시한다. 서로 다른 방향(질문형/공감형/용건형)으로, 각 1~2문장, 자연스러운 존댓말. 법령·조문 언급 금지, 가입 압박 금지, 컨텍스트에 없는 숫자 금지.',
       messages: [

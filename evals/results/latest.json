@@ -1,17 +1,17 @@
 {
-  "ts": "2026-08-14T14:26:54.531Z",
+  "ts": "2026-08-14T15:13:16.885Z",
   "total": 24,
-  "stableCount": 20,
-  "unstableCount": 4,
-  "passRate": 0.833,
+  "stableCount": 24,
+  "unstableCount": 0,
+  "passRate": 1,
   "baseline": 0.8,
   "byFeature": {
     "scenario": {
-      "stable": 3,
+      "stable": 5,
       "total": 5
     },
     "score": {
-      "stable": 4,
+      "stable": 6,
       "total": 6
     },
     "hint": {
@@ -23,9 +23,7 @@
       "total": 10
     }
   },
-  "regressions": [
-    "scenario-beauty"
-  ],
+  "regressions": [],
   "results": [
     {
       "id": "scenario-karaoke-old",
@@ -34,7 +32,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 7952,
+      "avgMs": 10666,
       "failSamples": []
     },
     {
@@ -44,32 +42,28 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 8283,
+      "avgMs": 9917,
       "failSamples": []
     },
     {
       "id": "scenario-beauty",
       "feature": "scenario",
       "desc": "미용업 596개월",
-      "runsPassed": 2,
-      "stable": false,
-      "unstable": true,
-      "avgMs": 7875,
-      "failSamples": [
-        "whitelist:no-invented-numbers(컨텍스트 밖 숫자 인용: 15)"
-      ]
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 9768,
+      "failSamples": []
     },
     {
       "id": "scenario-restaurant-new",
       "feature": "scenario",
       "desc": "신규 음식점 1개월",
-      "runsPassed": 1,
-      "stable": false,
-      "unstable": true,
-      "avgMs": 8330,
-      "failSamples": [
-        "whitelist:no-invented-numbers(컨텍스트 밖 숫자 인용: 17)"
-      ]
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 11811,
+      "failSamples": []
     },
     {
       "id": "scenario-relicense",
@@ -78,7 +72,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 7186,
+      "avgMs": 9836,
       "failSamples": []
     },
     {
@@ -88,7 +82,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 9225,
+      "avgMs": 8812,
       "failSamples": []
     },
     {
@@ -98,32 +92,28 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 10232,
+      "avgMs": 8951,
       "failSamples": []
     },
     {
       "id": "score-bad-1",
       "feature": "score",
       "desc": "못한 대화 1",
-      "runsPassed": 2,
-      "stable": false,
-      "unstable": true,
-      "avgMs": 8710,
-      "failSamples": [
-        "score:low<=40(50점)"
-      ]
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 6883,
+      "failSamples": []
     },
     {
       "id": "score-bad-2",
       "feature": "score",
       "desc": "못한 대화 2",
-      "runsPassed": 2,
-      "stable": false,
-      "unstable": true,
-      "avgMs": 9254,
-      "failSamples": [
-        "score:low<=40(50점)"
-      ]
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 6754,
+      "failSamples": []
     },
     {
       "id": "score-mid-1",
@@ -132,7 +122,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 9909,
+      "avgMs": 6855,
       "failSamples": []
     },
     {
@@ -142,7 +132,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 11274,
+      "avgMs": 7664,
       "failSamples": []
     },
     {
@@ -152,7 +142,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 5918,
+      "avgMs": 3473,
       "failSamples": []
     },
     {
@@ -162,7 +152,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 5224,
+      "avgMs": 2533,
       "failSamples": []
     },
     {
@@ -172,7 +162,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 4807,
+      "avgMs": 3106,
       "failSamples": []
     },
     {
@@ -182,7 +172,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3737,
+      "avgMs": 1558,
       "failSamples": []
     },
     {
@@ -192,7 +182,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3493,
+      "avgMs": 1947,
       "failSamples": []
     },
     {
@@ -202,7 +192,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3208,
+      "avgMs": 2109,
       "failSamples": []
     },
     {
@@ -212,7 +202,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3510,
+      "avgMs": 2196,
       "failSamples": []
     },
     {
@@ -222,7 +212,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 2257,
+      "avgMs": 1738,
       "failSamples": []
     },
     {
@@ -232,7 +222,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 2241,
+      "avgMs": 1708,
       "failSamples": []
     },
     {
@@ -242,7 +232,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3269,
+      "avgMs": 1487,
       "failSamples": []
     },
     {
@@ -252,7 +242,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1969,
+      "avgMs": 1896,
       "failSamples": []
     },
     {
@@ -262,7 +252,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3899,
+      "avgMs": 1650,
       "failSamples": []
     },
     {
@@ -272,7 +262,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3241,
+      "avgMs": 1882,
       "failSamples": []
     }
   ]

@@ -16,7 +16,7 @@ import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { recordLlmCall } from '@/lib/llm/metrics';
-import { LLM_MODEL } from '@/config/llm-model';
+import { LLM_MODEL_FAST, outputConfig } from '@/config/llm-model';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import {
   DAILY_LIMITS,
@@ -110,9 +110,9 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: LLM_MODEL,
+    model: LLM_MODEL_FAST, // 실시간 음성 대화 — haiku (수치 인용 없어 정확도 요구 낮음)
     max_tokens: TURN_MAX_TOKENS,
-    output_config: { effort: 'low' }, // 대화 지연 최소화 [미검증 가설]
+    output_config: outputConfig(LLM_MODEL_FAST, { effort: 'low' }), // haiku는 effort 미지원 → 자동 제외
     system: personaSystem(loaded.context, loaded.place.name, difficulty, ageIdx, temperIdx),
     messages,
   });

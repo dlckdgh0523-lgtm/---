@@ -5,7 +5,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import type { AssertResult } from './assert';
-import { LLM_MODEL } from '../src/config/llm-model';
+import { LLM_MODEL_BALANCED, outputConfig } from '../src/config/llm-model';
 
 const JUDGE_SYSTEM =
   '너는 보험설계사 첫 접근 문장 3개를 심사한다. 세 문장이 서로 "다른 각도"(예: 주년 축하 / 업종 공감 / 동네 이웃)인지만 판단한다. ' +
@@ -23,9 +23,9 @@ export async function judgeScenarioAngles(texts: string[]): Promise<AssertResult
   try {
     const client = new Anthropic();
     const res = await client.messages.create({
-      model: LLM_MODEL,
+      model: LLM_MODEL_BALANCED, // 심사자는 흔들리면 안 됨 — sonnet 이상 고정
       max_tokens: 512,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+      output_config: outputConfig(LLM_MODEL_BALANCED, { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } }),
       system: JUDGE_SYSTEM,
       messages: [{ role: 'user', content: texts.map((t, i) => `${i + 1}. ${t}`).join('\n') }],
     });

@@ -12,7 +12,7 @@ import { NextRequest } from 'next/server';
 import { DAILY_LIMITS } from '@/config/roleplay';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
-import { LLM_MODEL } from '@/config/llm-model';
+import { LLM_MODEL_ACCURATE, outputConfig } from '@/config/llm-model';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { recordLlmCall } from '@/lib/llm/metrics';
 import { loadPlaceContext } from '@/lib/server/place-context';
@@ -24,6 +24,8 @@ const SYSTEM_PROMPT = `너는 저연차 보험설계사의 현장 코치다. 사
 
 규칙 (위반 시 출력이 폐기된다):
 - 컨텍스트에 주어진 수치만 그대로 인용한다. 어떤 숫자도 새로 만들거나 계산하지 않는다.
+- ⚠️ 수치는 **반올림·근사·어림 없이 주어진 값 그대로** 쓴다. 폐업률이 16%면 정확히 "16%"라고 쓰고 "15%"나 "약 16%"로 바꾸지 않는다. 개월수·연수도 마찬가지다.
+- ⚠️ **구체적 연도(예: "2024년", "올해")를 계산하거나 언급하지 마라.** 현재가 몇 년인지 알 수 없다. 시간은 "개업 N개월", "N주년"처럼 컨텍스트에 주어진 상대 표현으로만 쓴다.
 - 법령·조문·과태료·의무보험을 언급하지 않는다. 검증된 법령 데이터가 제공되지 않았다.
 - 가입을 단정하거나 압박하지 않는다 ("꼭 가입하셔야" 금지). 보험 언급 자체를 최소화하고, 대화를 여는 것이 목적이다.
 - 금액 권고를 하지 않는다.
@@ -72,12 +74,9 @@ export async function POST(req: NextRequest) {
 
     const client = new Anthropic();
     const response = await client.messages.create({
-      model: LLM_MODEL,
+      model: LLM_MODEL_ACCURATE, // 폐업률 정확 인용 필요 — opus (지연 무관)
       max_tokens: 2048,
-      output_config: {
-        effort: 'medium',
-        format: { type: 'json_schema', schema: OUTPUT_SCHEMA },
-      },
+      output_config: outputConfig(LLM_MODEL_ACCURATE, { effort: 'medium', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } }),
       system: SYSTEM_PROMPT,
       messages: [
         {
