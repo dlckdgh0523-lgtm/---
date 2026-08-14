@@ -27,8 +27,13 @@ declare global {
 
 const KAKAO_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
 
+// 물방울 핀 — 끝이 아래를 가리키고 흰 테두리+그림자로 지도 위에서 확실히 튀게 (2026-08-14 피드백:
+// 기존 작은 원은 지도 아이콘과 구분이 안 됐음). 색은 GROUPS의 그룹 색.
 function pinSvg(color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
+    <path d="M14 2C7.9 2 3 6.9 3 13c0 7.7 8.4 17.6 10.2 19.6a1 1 0 0 0 1.6 0C16.6 30.6 25 20.7 25 13 25 6.9 20.1 2 14 2z" fill="${color}" stroke="#fff" stroke-width="2.5"/>
+    <circle cx="14" cy="13" r="4.6" fill="#fff"/>
+  </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -138,7 +143,7 @@ export default function PlacesPage() {
     const images = Object.fromEntries(
       GROUPS.map((g) => [
         g.key,
-        new kakao.maps.MarkerImage(pinSvg(g.color), new kakao.maps.Size(18, 18), { offset: new kakao.maps.Point(9, 9) }),
+        new kakao.maps.MarkerImage(pinSvg(g.color), new kakao.maps.Size(28, 38), { offset: new kakao.maps.Point(14, 36) }),
       ]),
     );
     markersRef.current = views.map((v) => {
