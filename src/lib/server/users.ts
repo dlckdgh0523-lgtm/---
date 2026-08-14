@@ -22,13 +22,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { redisAvailable, redisCommand } from '@/lib/server/redis';
-import type { AgentProfile } from '@/types';
+import type { StoredProfile } from '@/types';
 
 export interface UserRecord {
   email: string;
   authHash: string; // scrypt(authProof, salt) — authProof는 클라이언트가 PBKDF2로 파생한 64자 hex
   salt: string;
-  profile: AgentProfile | null; // 온보딩 완료 전 null
+  profile: StoredProfile | null; // 온보딩 완료 전 null. 금액은 moneyEnc 암호문으로만 (2026-08-14)
   createdAt: string;
   updatedAt: string;
 }
@@ -96,7 +96,12 @@ export async function verifyAuthProof(email: string, authProof: string): Promise
   return crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(user.authHash)) ? user : null;
 }
 
-export async function updateUser(email: string, patch: { profile?: AgentProfile }): Promise<UserRecord | null> {
+/** 관리자 익명 집계용 — 이메일은 반환하지 않는다. 프로필 금액은 애초에 암호문(moneyEnc)이라 서버가 열 수 없다. */
+export async function listUserProfiles(): Promise<(StoredProfile | null)[]> {
+  return (await load()).map((u) => u.profile);
+}
+
+export async function updateUser(email: string, patch: { profile?: StoredProfile }): Promise<UserRecord | null> {
   const list = await load();
   const user = list.find((u) => u.email === email.toLowerCase());
   if (!user) return null;

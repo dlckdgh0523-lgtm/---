@@ -17,6 +17,18 @@ export const RECOGNITION_FAIL_WARN_RATE = 0.3;
 export const MAX_USER_TURNS = 12;
 export const TURN_MAX_TOKENS = 400;
 
+/**
+ * 일일 한도 (계정=JWT 기준, Redis 카운트). 관리자 화면에 사용량과 함께 표시.
+ * 롤플레잉은 턴 기준 — 세션 기준을 기각한 이유: 세션 경계는 클라이언트 신고값이라
+ * 서버가 신뢰할 수 없고, 비용 발생 단위가 턴이다. 300턴 ≈ 세션 25회 분량 (2026-08-14 상향, 구 30).
+ */
+export const DAILY_LIMITS = {
+  roleplayTurns: 300,
+  scores: 40,
+  hints: 60,
+  scenarios: 30,
+} as const;
+
 /** 힌트 1회당 감점(점수 100 기준), 감점 상한 [미검증 가설] */
 export const HINT_PENALTY = 3;
 export const HINT_PENALTY_CAP = 15;

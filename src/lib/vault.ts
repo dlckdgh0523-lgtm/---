@@ -66,10 +66,12 @@ function resetIdleTimer(): void {
 }
 
 function attachActivityListeners(): void {
+  if (typeof window === 'undefined') return; // 테스트(node) 환경 가드
   ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, resetIdleTimer, { passive: true }));
 }
 
 function detachActivityListeners(): void {
+  if (typeof window === 'undefined') return;
   ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, resetIdleTimer));
 }
 
@@ -189,4 +191,16 @@ export async function saveVaultContracts(contracts: Contract[]): Promise<void> {
 /** 현재 금고 소유 계정 (잠금 화면 표기용) */
 export function vaultOwner(): string | null {
   return vaultEmail;
+}
+
+/**
+ * 범용 암호화 블롭 — 프로필 금액 필드의 서버 저장용 (2026-08-14).
+ * 서버는 이 문자열({iv, ct})만 보관하며 내용을 열 수 없다.
+ */
+export async function sealJson(value: unknown): Promise<string> {
+  return encryptJson(value);
+}
+
+export async function openJson<T>(raw: string): Promise<T> {
+  return decryptJson<T>(raw);
 }

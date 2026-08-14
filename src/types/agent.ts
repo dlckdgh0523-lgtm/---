@@ -1,7 +1,9 @@
 /**
  * 설계사 온보딩 프로필.
- * ⚠️ 개인정보 원칙 (PRD §8.2): 이 타입의 인스턴스는 브라우저 localStorage에만 저장한다.
- * 서버 전송 금지. 익명 집계는 stats.ts의 AnonymousStat으로만, 옵트인 시에만.
+ * ⚠️ 개인정보 원칙 (2026-08-14 확정): 금액성 필드(PROFILE_MONEY_FIELDS)는 서버에
+ * 클라이언트 암호화 블롭(moneyEnc)으로만 저장된다 — 서버는 평문 금액을 보관하지 않는다.
+ * 비금액 필드(지역·소속·상품·수수료 구조)는 집계용으로 평문 유지 (비식별).
+ * 익명 집계는 stats.ts의 AnonymousStat으로만, 옵트인 시에만.
  * 금액 단위: 만원 (전 필드 공통).
  */
 
@@ -79,3 +81,18 @@ export interface AgentProfile {
   createdAt: string;
   updatedAt: string;
 }
+
+/** 서버에 평문으로 두지 않는 금액성 필드 (2026-08-14 지시) — 서버는 수신 시 이 필드들을 능동 삭제한다 */
+export const PROFILE_MONEY_FIELDS = [
+  'avgCommission3m',
+  'cashOnHand',
+  'monthlyFixedExpense',
+  'monthlyGoal',
+  'companyMinimum',
+] as const;
+
+export type ProfileMoneyField = (typeof PROFILE_MONEY_FIELDS)[number];
+export type ProfileMoney = Pick<AgentProfile, ProfileMoneyField>;
+
+/** 서버 저장 형태 — 금액은 moneyEnc(클라이언트 AES-GCM 암호문)로만 */
+export type StoredProfile = Omit<AgentProfile, ProfileMoneyField> & { moneyEnc?: string };

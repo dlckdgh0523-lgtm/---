@@ -6,11 +6,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
+import { DAILY_LIMITS } from '@/config/roleplay';
 import { guardLlmOutput } from '@/lib/llm/guard';
+import { recordLlmCall } from '@/lib/llm/metrics';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { loadPlaceContext } from '@/lib/server/place-context';
 
-const HINTS_PER_DAY = 60; // [미검증 가설]
+const HINTS_PER_DAY = DAILY_LIMITS.hints; // config 단일 출처
 
 const OUTPUT_SCHEMA = {
   type: 'object' as const,
@@ -27,6 +29,7 @@ export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ status: 'disabled' });
   if (!(await checkRate(`hint:${email}`, HINTS_PER_DAY))) return Response.json({ status: 'error', message: '힌트 한도 초과' }, { status: 429 });
 
+  const startedAt = Date.now();
   try {
     const { region, placeId, history = [] } = (await req.json()) as {
       region?: string;
@@ -55,13 +58,16 @@ export async function POST(req: NextRequest) {
     if (response.stop_reason === 'refusal') return Response.json({ status: 'error', message: '생성 거부' });
     const block = response.content.find((b) => b.type === 'text');
     if (!block || block.type !== 'text') return Response.json({ status: 'error', message: '파싱 실패' });
-    const candidates = (JSON.parse(block.text) as { candidates: string[] }).candidates
-      .map((c) => guardLlmOutput(c))
-      .filter((g) => g.ok)
-      .map((g) => g.text)
-      .slice(0, 3);
+    const guarded = (JSON.parse(block.text) as { candidates: string[] }).candidates.map((c) => guardLlmOutput(c));
+    const candidates = guarded.filter((g) => g.ok).map((g) => g.text).slice(0, 3);
+    void recordLlmCall('hint', {
+      ok: candidates.length > 0,
+      latencyMs: Date.now() - startedAt,
+      guardViolations: guarded.flatMap((g) => g.violations),
+    });
     return Response.json({ status: 'ok', candidates });
   } catch (e) {
+    void recordLlmCall('hint', { ok: false, latencyMs: Date.now() - startedAt });
     return Response.json({ status: 'error', message: e instanceof Error ? e.message : 'unknown' }, { status: 500 });
   }
 }

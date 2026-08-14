@@ -1,0 +1,20 @@
+# 데이터 파이프라인 재현 실행.
+#   지역 팩 생성:   docker compose run --rm build-region
+#   다른 지역:      SIGUNGU=11680 docker compose run --rm build-region
+#   생존 분석:      docker compose run --rm build-survival
+# 전제: ./data/raw 에 원본 CSV(공공데이터포털 수동 다운로드)가 있어야 한다.
+services:
+  build-region:
+    build: .
+    command: ["scripts/build-region.ts", "--sigungu=${SIGUNGU:-11170}"]
+    volumes:
+      - ./data:/app/data
+      - ./public/data:/app/public/data
+
+  build-survival:
+    build: .
+    command: ["scripts/build-survival.ts"]
+    volumes:
+      - ./data:/app/data
+      - ./public/data:/app/public/data
+      - ./src/data:/app/src/data

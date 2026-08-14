@@ -6,7 +6,7 @@
 import { NextRequest } from 'next/server';
 import { findUser, updateUser } from '@/lib/server/users';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
-import type { AgentProfile } from '@/types';
+import { PROFILE_MONEY_FIELDS, type StoredProfile } from '@/types';
 
 function authedEmail(req: NextRequest): string | null {
   return verifySession(req.cookies.get(SESSION_COOKIE)?.value);
@@ -24,7 +24,14 @@ export async function PUT(req: NextRequest) {
   const email = authedEmail(req);
   if (!email) return Response.json({ ok: false }, { status: 401 });
   try {
-    const { profile } = (await req.json()) as { profile?: AgentProfile };
+    const { profile } = (await req.json()) as { profile?: StoredProfile };
+    // 2중 방어: 클라이언트가 실수로 평문 금액을 보내도 서버는 저장 전에 능동 삭제한다.
+    // 금액은 moneyEnc(클라이언트 AES-GCM 암호문)로만 보관된다 — 서버는 열 수 없다.
+    if (profile) {
+      for (const field of PROFILE_MONEY_FIELDS) {
+        delete (profile as Record<string, unknown>)[field];
+      }
+    }
     const user = await updateUser(email, { profile });
     if (!user) return Response.json({ ok: false }, { status: 401 });
     return Response.json({ ok: true });

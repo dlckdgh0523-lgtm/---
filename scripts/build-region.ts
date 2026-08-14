@@ -27,12 +27,8 @@ import type { Place } from '../src/types';
 const RAW = path.join(process.cwd(), 'data', 'raw');
 const OUT_ROOT = path.join(process.cwd(), 'public', 'data', 'regions');
 
-// 행안부 LOCALDATA 좌표계 후보. 기본 가정은 EPSG:5174(중부원점, Bessel, 보정 경도).
-const PROJ_5174 =
-  '+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43';
-const PROJ_2097 =
-  '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43';
-const KOREA_BBOX = { minLng: 124.5, maxLng: 132.0, minLat: 33.0, maxLat: 39.5 };
+// 좌표계 정의는 src/lib/geo.ts 단일 출처 (Jest 테스트와 공유 — 2026-08-14)
+import { KOREA_BBOX, PROJ_2097, PROJ_5174 } from '../src/lib/geo';
 
 interface RegionsGenerated {
   sido: { code: string; name: string; sigungu: { code: string; name: string }[] }[];

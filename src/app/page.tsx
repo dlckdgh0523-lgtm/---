@@ -34,7 +34,7 @@ export default function LandingPage() {
     const preview = window.location.search.includes('preview');
     (async () => {
       const me = preview ? null : await fetchMe();
-      if (me) router.replace(me.profile ? '/dashboard' : '/settings');
+      if (me) router.replace(me.stored ? '/dashboard' : '/settings');
       else setReady(true);
     })();
   }, [router]);

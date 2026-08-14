@@ -15,8 +15,10 @@ import { NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
 import { checkRate } from '@/lib/llm/rate-limit';
+import { recordLlmCall } from '@/lib/llm/metrics';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import {
+  DAILY_LIMITS,
   DIFFICULTY_LABEL,
   MAX_USER_TURNS,
   TURN_MAX_TOKENS,
@@ -26,7 +28,7 @@ import {
 } from '@/config/roleplay';
 import type { ScenarioContext } from '@/lib/llm/types';
 
-const TURNS_PER_DAY = 30; // 계정(JWT)당 일일 상한 — 2026-08-14 지시 "30회/일", Redis 카운트 (≈세션 2~3회 분량)
+const TURNS_PER_DAY = DAILY_LIMITS.roleplayTurns; // 계정(JWT)당 일일 턴 상한 — config 단일 출처
 
 const DIFFICULTY_BRIEF: Record<Difficulty, string> = {
   easy: '너는 보험에 관심이 있지만 정보가 부족하다. 궁금한 것을 물어보고, 상대가 쉽게 설명하면 호의적으로 반응한다.',
@@ -93,6 +95,9 @@ export async function POST(req: NextRequest) {
   const loaded = loadPlaceContext(region, placeId);
   if (!loaded) return new Response('not found', { status: 404 });
 
+  const startedAt = Date.now();
+  const guardViolations: string[] = [];
+
   // 사용자 발화는 user 메시지로만 — 히스토리도 역할별로 정확히 매핑 (병합 금지)
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-20).map((h) => ({
@@ -136,6 +141,7 @@ export async function POST(req: NextRequest) {
           }
           if (sentence) {
             const guarded = guardLlmOutput(sentence);
+            guardViolations.push(...guarded.violations);
             if (guarded.ok) controller.enqueue(encoder.encode(guarded.text + '\n'));
           }
           if (final && buffer.length === 0) break;
@@ -152,17 +158,21 @@ export async function POST(req: NextRequest) {
         const finalMsg = await stream.finalMessage();
         if (finalMsg.stop_reason === 'refusal') {
           controller.enqueue(encoder.encode('__ERROR__\n'));
+          void recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
         } else {
           flushSentences(true);
           if (buffer.trim()) {
             const guarded = guardLlmOutput(buffer.trim().replace('[대화종료]', ''));
+            guardViolations.push(...guarded.violations);
             if (buffer.includes('[대화종료]')) ended = true;
             if (guarded.ok && guarded.text) controller.enqueue(encoder.encode(guarded.text + '\n'));
           }
           if (ended) controller.enqueue(encoder.encode('__END__\n'));
+          void recordLlmCall('roleplay-turn', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
         }
       } catch {
         controller.enqueue(encoder.encode('__ERROR__\n'));
+        void recordLlmCall('roleplay-turn', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
       } finally {
         controller.close();
       }

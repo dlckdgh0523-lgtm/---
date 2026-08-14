@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import iconv from 'iconv-lite';
 import { parse } from 'csv-parse';
+import { bucketHazard as bucketHazardShared, conditionalSurvival, kaplanMeier as kaplanMeierShared } from '../src/lib/survival-math';
 
 const RAW = path.join(process.cwd(), 'data', 'raw');
 const PREFIX = '서울특별시 용산구';
@@ -45,70 +46,9 @@ function parseDate(raw: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** 이산(월) Kaplan-Meier: durations = [{t, event}] */
-function kaplanMeier(recs: { t: number; event: boolean }[]): number[] {
-  const events = new Array(MAX_MONTH + 1).fill(0);
-  const exits = new Array(MAX_MONTH + 1).fill(0); // 사건+절단 모두 (t에서 위험집합 이탈)
-  for (const r of recs) {
-    const t = Math.min(Math.max(0, r.t), MAX_MONTH);
-    exits[t] += 1;
-    if (r.event) events[t] += 1;
-  }
-  const total = recs.length;
-  const surv: number[] = [];
-  let atRisk = total;
-  let s = 1;
-  for (let m = 0; m <= MAX_MONTH; m++) {
-    if (atRisk > 0) s *= 1 - events[m] / atRisk;
-    surv.push(s);
-    atRisk -= exits[m];
-  }
-  return surv;
-}
-
-/** 구간 조건부 폐업률: 시작 시점 생존자 중 구간 내 폐업 비율 = 1 - S(end)/S(start) */
-function bucketHazard(surv: number[], start: number, end: number): number {
-  const s0 = start === 0 ? 1 : surv[start - 1];
-  const s1 = surv[Math.min(end, MAX_MONTH)];
-  return s0 > 0 ? 1 - s1 / s0 : 0;
-}
-
-/**
- * 나이 fromAge 생존자를 재기점으로 한 조건부 KM + Greenwood 95% 신뢰구간.
- * atRisk = 재기점 위험집합 크기 — "표본 수"로 이 값을 쓴다 (전체 n이 아니라).
- * 표본 30건 미만이면 reliable=false → 화면·계산기에서 점추정 노출 금지 (2026-08-13 지시).
- */
-function conditionalSurvival(recs: { t: number; event: boolean }[], fromAge: number, horizon: number) {
-  const sub = recs.filter((r) => r.t >= fromAge + 1);
-  const atRisk0 = sub.length;
-  const events = new Array(horizon + 1).fill(0);
-  const exits = new Array(horizon + 1).fill(0);
-  for (const r of sub) {
-    const rel = r.t - fromAge;
-    const t = Math.min(rel, horizon);
-    exits[t] += 1;
-    if (r.event && rel <= horizon) events[t] += 1;
-  }
-  let n = atRisk0;
-  let s = 1;
-  let greenwood = 0;
-  for (let m = 0; m <= horizon; m++) {
-    const d = events[m];
-    if (n > 0 && d > 0) {
-      s *= 1 - d / n;
-      if (n - d > 0) greenwood += d / (n * (n - d));
-    }
-    n -= exits[m];
-  }
-  const se = s * Math.sqrt(greenwood);
-  return {
-    survival: s,
-    ciLow: Math.max(0, s - 1.96 * se),
-    ciHigh: Math.min(1, s + 1.96 * se),
-    atRisk: atRisk0,
-    reliable: atRisk0 >= 30,
-  };
-}
+// KM·조건부 생존 수학은 src/lib/survival-math.ts 단일 구현을 쓴다 (Jest 테스트와 공유 — 2026-08-14)
+const kaplanMeier = (recs: { t: number; event: boolean }[]) => kaplanMeierShared(recs, MAX_MONTH);
+const bucketHazard = (surv: number[], start: number, end: number) => bucketHazardShared(surv, start, end, MAX_MONTH);
 
 async function main() {
   const files = fs

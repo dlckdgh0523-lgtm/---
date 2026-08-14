@@ -14,15 +14,17 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { checkRate } from '@/lib/llm/rate-limit';
+import { recordLlmCall } from '@/lib/llm/metrics';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import {
+  DAILY_LIMITS,
   HINT_PENALTY,
   HINT_PENALTY_CAP,
   RECOGNITION_FAIL_WARN_RATE,
   RUBRIC,
 } from '@/config/roleplay';
 
-const SCORES_PER_DAY = 40; // [미검증 가설]
+const SCORES_PER_DAY = DAILY_LIMITS.scores; // config 단일 출처
 
 export interface TranscriptLine {
   speaker: 'user' | 'owner';
@@ -132,6 +134,8 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `[기준]\n${RUBRIC.map((r) => `- id=${r.id}: ${r.question}`).join('\n')}\n\n[전사]\n${transcriptText}`;
 
+    const startedAt = Date.now();
+    let retryCount = 0;
     const client = new Anthropic();
     let raw = await judge(client, systemPrompt, userPrompt);
 
@@ -158,6 +162,7 @@ export async function POST(req: NextRequest) {
     let verdicts = validate(raw);
     if (verdicts.some((v) => !v.quoteValid)) {
       // 1회 재시도 — 인용 규칙 재강조
+      retryCount = 1;
       try {
         raw = await judge(client, systemPrompt, `${userPrompt}\n\n[재시도] 이전 판정 중 인용이 전사에 없거나 저신뢰 발화였다. quote는 전사 문장을 글자 그대로 복사하라.`);
         verdicts = validate(raw);
@@ -171,6 +176,7 @@ export async function POST(req: NextRequest) {
     const hintPenalty = Math.min(hintCount * HINT_PENALTY, HINT_PENALTY_CAP);
     const score = Math.max(0, base - hintPenalty);
 
+    void recordLlmCall('roleplay-score', { ok: true, latencyMs: Date.now() - startedAt, retries: retryCount });
     return Response.json({
       status: 'ok',
       score,
@@ -181,6 +187,7 @@ export async function POST(req: NextRequest) {
       lowReliability: recognitionFailRate >= RECOGNITION_FAIL_WARN_RATE,
     } satisfies ScoreResult);
   } catch (e) {
+    void recordLlmCall('roleplay-score', { ok: false, latencyMs: 0 });
     return Response.json({ status: 'error', message: e instanceof Error ? e.message : 'unknown' } satisfies ScoreResult, { status: 500 });
   }
 }

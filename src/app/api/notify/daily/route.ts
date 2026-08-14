@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { send } from '@/lib/notify';
 import { buildPayload } from '@/lib/notify/build';
 import { listSubscribers } from '@/lib/server/subscribers';
+import { saveNotifyRun } from '@/lib/server/ops';
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -29,5 +30,12 @@ export async function GET(req: NextRequest) {
     const r = await send(payload, sub.email, 'email');
     results.push({ email: sub.email, region: sub.region, ...r });
   }
+  // 관리자 화면용 발송 이력 — 수신자 주소는 기록하지 않는다
+  await saveNotifyRun({
+    at: new Date().toISOString(),
+    total: subscribers.length,
+    okCount: results.filter((r) => r.ok).length,
+    dry,
+  });
   return Response.json({ ok: true, total: subscribers.length, results });
 }

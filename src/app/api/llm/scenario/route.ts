@@ -9,13 +9,15 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest } from 'next/server';
+import { DAILY_LIMITS } from '@/config/roleplay';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
 import { checkRate } from '@/lib/llm/rate-limit';
+import { recordLlmCall } from '@/lib/llm/metrics';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import type { Scenario, ScenarioLookup } from '@/lib/llm/types';
 
-const RATE_LIMIT = 30; // 24시간당 (자원 통제)
+const RATE_LIMIT = DAILY_LIMITS.scenarios; // config 단일 출처
 
 const SYSTEM_PROMPT = `너는 저연차 보험설계사의 현장 코치다. 사업장에 처음 방문할 때 쓸 "첫 접근 문장" 3개를 서로 다른 각도로 만든다.
 
@@ -55,6 +57,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ status: 'error', message: '오늘 생성 한도에 도달했습니다. 내일 다시 시도하세요.' } satisfies ScenarioLookup, { status: 429 });
   }
 
+  const startedAt = Date.now();
+  const guardViolations: string[] = [];
   try {
     const { region, placeId } = (await req.json()) as { region?: string; placeId?: string };
     if (!region || !placeId) {
@@ -95,20 +99,24 @@ export async function POST(req: NextRequest) {
     const scenarios = parsed.scenarios
       .map((s) => {
         const guarded = guardLlmOutput(s.text);
+        guardViolations.push(...guarded.violations);
         return guarded.ok ? { angle: s.angle.slice(0, 40), text: guarded.text } : null;
       })
       .filter((s): s is Scenario => s !== null)
       .slice(0, 3);
 
     if (scenarios.length === 0) {
+      void recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
       return Response.json({ status: 'error', message: '필터를 통과한 문장이 없습니다. 다시 시도하세요.' } satisfies ScenarioLookup);
     }
+    void recordLlmCall('scenario', { ok: true, latencyMs: Date.now() - startedAt, guardViolations });
     return Response.json({
       status: 'ok',
       scenarios,
       note: 'AI 생성 문구입니다 — 사실 여부를 확인하고 본인 말투로 다듬어 쓰세요.',
     } satisfies ScenarioLookup);
   } catch (e) {
+    void recordLlmCall('scenario', { ok: false, latencyMs: Date.now() - startedAt, guardViolations });
     return Response.json(
       { status: 'error', message: e instanceof Error ? e.message : 'unknown' } satisfies ScenarioLookup,
       { status: 500 },

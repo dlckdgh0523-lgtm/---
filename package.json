@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "jest",
     "build:region": "tsx scripts/build-region.ts",
     "extract:regions": "tsx scripts/extract-regions.ts"
   },
@@ -17,12 +18,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/proj4": "^2.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "csv-parse": "^7.0.2",
     "iconv-lite": "^0.7.3",
+    "jest": "^30.4.2",
     "proj4": "^2.21.0",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.23.12",
