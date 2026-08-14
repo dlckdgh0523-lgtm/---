@@ -16,6 +16,7 @@ import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { recordLlmCall } from '@/lib/llm/metrics';
+import { LLM_MODEL } from '@/config/llm-model';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import {
   DAILY_LIMITS,
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: 'claude-opus-5',
+    model: LLM_MODEL,
     max_tokens: TURN_MAX_TOKENS,
     output_config: { effort: 'low' }, // 대화 지연 최소화 [미검증 가설]
     system: personaSystem(loaded.context, loaded.place.name, difficulty, ageIdx, temperIdx),

@@ -12,6 +12,7 @@ import { NextRequest } from 'next/server';
 import { DAILY_LIMITS } from '@/config/roleplay';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { guardLlmOutput } from '@/lib/llm/guard';
+import { LLM_MODEL } from '@/config/llm-model';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { recordLlmCall } from '@/lib/llm/metrics';
 import { loadPlaceContext } from '@/lib/server/place-context';
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const client = new Anthropic();
     const response = await client.messages.create({
-      model: 'claude-opus-5',
+      model: LLM_MODEL,
       max_tokens: 2048,
       output_config: {
         effort: 'medium',

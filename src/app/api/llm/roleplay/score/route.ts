@@ -15,6 +15,7 @@ import { NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/server/session';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { recordLlmCall } from '@/lib/llm/metrics';
+import { LLM_MODEL } from '@/config/llm-model';
 import { loadPlaceContext } from '@/lib/server/place-context';
 import {
   DAILY_LIMITS,
@@ -79,7 +80,7 @@ const norm = (s: string) => s.replace(/\s+/g, '');
 
 async function judge(client: Anthropic, systemPrompt: string, userPrompt: string) {
   const response = await client.messages.create({
-    model: 'claude-opus-5',
+    model: LLM_MODEL,
     max_tokens: 2048,
     output_config: { effort: 'medium', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
     system: systemPrompt,

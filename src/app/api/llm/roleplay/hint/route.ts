@@ -11,6 +11,7 @@ import { guardLlmOutput } from '@/lib/llm/guard';
 import { recordLlmCall } from '@/lib/llm/metrics';
 import { checkRate } from '@/lib/llm/rate-limit';
 import { loadPlaceContext } from '@/lib/server/place-context';
+import { LLM_MODEL } from '@/config/llm-model';
 
 const HINTS_PER_DAY = DAILY_LIMITS.hints; // config 단일 출처
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     const transcript = history.slice(-10).map((h) => `${h.speaker === 'user' ? '설계사' : '사장님'}: ${h.text.slice(0, 300)}`).join('\n');
     const client = new Anthropic();
     const response = await client.messages.create({
-      model: 'claude-opus-5',
+      model: LLM_MODEL,
       max_tokens: 1024,
       output_config: { effort: 'low', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
       system:
