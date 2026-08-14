@@ -154,14 +154,15 @@ export default function PlacesPage() {
     clustererRef.current = clusterer;
   }, [sdkReady, views]);
 
-  // 필터 → 마커 즉시 반영
+  // 필터 → 마커 즉시 반영. sdkReady를 dep에 포함해야 지도 초기화(clusterer 생성) 직후에도 실행된다
+  // (filtered만 dep로 두면 clusterer가 생기기 전 1회만 돌고 재실행되지 않아 마커가 영영 안 붙는다).
   useEffect(() => {
     const clusterer = clustererRef.current;
     if (!clusterer) return;
     const ids = new Set(filtered.map((v) => v.place.id));
     clusterer.clear();
     clusterer.addMarkers(markersRef.current.filter((m) => ids.has(m.place.id)).map((m) => m.marker));
-  }, [filtered]);
+  }, [filtered, sdkReady]);
 
   // 상세 패널 열릴 때 건축물대장 온디맨드 조회 (클라이언트 캐시 + 서버 캐시)
   useEffect(() => {
