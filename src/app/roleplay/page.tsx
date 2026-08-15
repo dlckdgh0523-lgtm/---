@@ -79,7 +79,6 @@ export default function RoleplayPage() {
   const [interim, setInterim] = useState('');
   const [micLevel, setMicLevel] = useState(0);
   const [transcript, setTranscript] = useState<UtterLine[]>([]);
-  const [showTranscript, setShowTranscript] = useState(false);
   const [hintCount, setHintCount] = useState(0);
   const [hints, setHints] = useState<string[] | null>(null);
   const [hintBusy, setHintBusy] = useState(false);
@@ -100,6 +99,7 @@ export default function RoleplayPage() {
   const endedRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
 
   transcriptRef.current = transcript;
   bargeInRef.current = bargeIn;
@@ -120,6 +120,12 @@ export default function RoleplayPage() {
     setAgeIdx(Math.floor(Math.random() * VIRTUAL_AGE_BANDS.length));
     setTemperIdx(Math.floor(Math.random() * VIRTUAL_TEMPERS.length));
   }, [authStatus, profile]);
+
+  // 대화 스레드 자동 스크롤 (항상 하단 고정)
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [transcript, interim, liveStatus]);
 
   // ---------- TTS: 문장 단위 큐 재생 (긴 텍스트 중단 이슈 회피) ----------
   const pickKoVoice = useCallback((): SpeechSynthesisVoice | null => {
@@ -587,57 +593,91 @@ export default function RoleplayPage() {
       speaking: { icon: '🔊', label: '말하는 중', color: 'text-emerald-600' },
     }[liveStatus];
     const userTurns = transcript.filter((l) => l.speaker === 'user').length;
-    const lastOwner = [...transcript].reverse().find((l) => l.speaker === 'owner');
+
+    const submitText = () => {
+      const text = textInput.trim();
+      if (!text || liveStatus !== 'listening') return;
+      const line: UtterLine = { speaker: 'user', text, confidence: 1, lowConfidence: false };
+      setTranscript((prev) => [...prev, line]);
+      transcriptRef.current = [...transcriptRef.current, line];
+      setTextInput('');
+      void sendTurn(text);
+    };
 
     return (
       <div className="mx-auto max-w-lg">
         {placeBar}
-        <div className="flex min-h-[60vh] flex-col items-center justify-center py-8 text-center">
-          <p className={`text-6xl`}>{statusView.icon}</p>
-          <p className={`mt-3 text-2xl font-extrabold ${statusView.color}`}>{statusView.label}</p>
-
-          {/* 마이크 레벨 — 마이크가 살아있는지 보이게 */}
-          {voiceMode && (
-            <div className="mt-3 h-2 w-48 overflow-hidden rounded-full bg-[#F2F4F6]">
-              <div className="h-2 rounded-full bg-[#3182F6] transition-all duration-75" style={{ width: `${Math.round(micLevel * 100)}%` }} />
-            </div>
-          )}
-
-          {/* 실시간 전사 (interim) / 사장님 마지막 말 */}
-          <div className="mt-6 min-h-16 w-full max-w-md">
-            {liveStatus === 'listening' && interim && (
-              <p className={`text-lg ${INK}`}>“{interim}”</p>
-            )}
-            {liveStatus === 'speaking' && lastOwner && (
-              <p className={`text-lg ${SUB}`}>사장님: “{lastOwner.text}”</p>
+        <div className="flex flex-col py-4">
+          {/* 상태 표시 (상단, 작게) */}
+          <div className="flex items-center justify-center gap-2 py-1">
+            <span className="text-2xl">{statusView.icon}</span>
+            <span className={`text-sm font-bold ${statusView.color}`}>{statusView.label}</span>
+            {voiceMode && (
+              <span className="ml-1 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-[#F2F4F6] align-middle">
+                <span className="block h-1.5 rounded-full bg-[#3182F6] transition-all duration-75" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+              </span>
             )}
           </div>
 
-          {/* 텍스트 폴백 입력 */}
-          {!voiceMode && liveStatus === 'listening' && (
-            <div className="mt-4 flex w-full max-w-md gap-2">
+          {/* 대화 스레드 — 항상 보임. 말하면 사장님 답이 여기에 이어진다 */}
+          <div ref={threadRef} className="mt-2 max-h-[50vh] min-h-[38vh] space-y-2 overflow-y-auto rounded-2xl bg-[#F9FAFB] p-4">
+            {transcript.length === 0 && liveStatus !== 'thinking' && (
+              <p className="py-10 text-center text-sm text-slate-400">
+                {voiceMode ? '말을 걸어보세요. 사장님이 대답합니다.' : '아래에 할 말을 입력하고 Enter를 누르세요. 사장님이 대답합니다.'}
+              </p>
+            )}
+            {transcript.map((l, i) => (
+              <div key={i} className={l.speaker === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                <div
+                  className={`max-w-[82%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                    l.speaker === 'user' ? 'bg-[#3182F6] text-white' : 'border border-[#EDF0F3] bg-white text-[#191F28]'
+                  }`}
+                >
+                  <span className="mb-0.5 block text-[11px] opacity-60">{l.speaker === 'user' ? '나' : '사장님'}</span>
+                  {l.text}
+                  {l.lowConfidence && <span className="ml-1 text-[10px] text-amber-500">[인식 신뢰도 낮음]</span>}
+                </div>
+              </div>
+            ))}
+            {liveStatus === 'listening' && interim && (
+              <div className="flex justify-end">
+                <div className="max-w-[82%] rounded-2xl border border-dashed border-[#3182F6] px-3.5 py-2 text-sm text-[#3182F6]">{interim}</div>
+              </div>
+            )}
+            {liveStatus === 'thinking' && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl border border-[#EDF0F3] bg-white px-3.5 py-2 text-sm text-slate-400">사장님이 생각 중…</div>
+              </div>
+            )}
+          </div>
+
+          {/* 입력 (텍스트 모드) — 항상 보이고 응답 처리 중엔 잠시 비활성 */}
+          {!voiceMode && (
+            <div className="mt-3 flex gap-2">
               <input
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && textInput.trim()) {
-                    const line: UtterLine = { speaker: 'user', text: textInput.trim(), confidence: 1, lowConfidence: false };
-                    setTranscript((prev) => [...prev, line]);
-                    transcriptRef.current = [...transcriptRef.current, line];
-                    setTextInput('');
-                    void sendTurn(line.text);
-                  }
+                  if (e.key === 'Enter') submitText();
                 }}
-                placeholder="사장님께 할 말을 입력하고 Enter"
-                className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm"
+                disabled={liveStatus !== 'listening'}
+                placeholder={liveStatus === 'listening' ? '사장님께 할 말을 입력하고 Enter' : '사장님이 대답하는 중…'}
+                className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm disabled:bg-slate-50 disabled:text-slate-400"
               />
+              <button
+                onClick={submitText}
+                disabled={liveStatus !== 'listening' || !textInput.trim()}
+                className="rounded-2xl bg-[#3182F6] px-5 text-sm font-bold text-white disabled:bg-slate-300"
+              >
+                전송
+              </button>
             </div>
           )}
 
-          {notice && <p className="mt-3 text-sm text-amber-700">{notice}</p>}
+          {notice && <p className="mt-2 text-center text-sm text-amber-700">{notice}</p>}
 
-          {/* 힌트 — 누를 때만 후보 제시, 사용 횟수는 채점에 반영 */}
-          <div className="mt-6 flex items-center gap-3">
+          {/* 힌트 / 종료 */}
+          <div className="mt-4 flex items-center justify-center gap-3">
             <button
               onClick={() => void requestHint()}
               disabled={hintBusy || liveStatus !== 'listening'}
@@ -651,26 +691,19 @@ export default function RoleplayPage() {
             <span className="text-xs text-slate-400">{userTurns}/{MAX_USER_TURNS}턴</span>
           </div>
           {hints && (
-            <div className="mt-3 w-full max-w-md space-y-1.5 text-left">
+            <div className="mt-3 space-y-1.5 text-left">
               {hints.map((h) => (
-                <p key={h} className="rounded-xl bg-[#E8F3FF] px-3 py-2 text-sm text-slate-700">{h}</p>
+                <button
+                  key={h}
+                  onClick={() => {
+                    if (!voiceMode) setTextInput(h);
+                  }}
+                  className="block w-full rounded-xl bg-[#E8F3FF] px-3 py-2 text-left text-sm text-slate-700"
+                >
+                  {h}
+                </button>
               ))}
-              <p className="text-xs text-slate-400">힌트 사용은 채점에 기록됩니다 — 참고만 하고 본인 말로 하세요.</p>
-            </div>
-          )}
-
-          {/* 전체 전사는 접어둠 */}
-          <button onClick={() => setShowTranscript((v) => !v)} className="mt-6 text-xs text-slate-400 underline">
-            {showTranscript ? '전사 접기' : `전체 전사 보기 (${transcript.length})`}
-          </button>
-          {showTranscript && (
-            <div className="mt-2 max-h-48 w-full max-w-md space-y-1 overflow-y-auto text-left text-xs">
-              {transcript.map((l, i) => (
-                <p key={i} className={l.speaker === 'user' ? INK : SUB}>
-                  <b>{l.speaker === 'user' ? '나' : '사장님'}:</b> {l.text}
-                  {l.lowConfidence && <span className="ml-1 text-amber-600">[인식 신뢰도 낮음]</span>}
-                </p>
-              ))}
+              <p className="text-xs text-slate-400">힌트는 참고용입니다. 그대로 쓰기보다 본인 말로 바꿔 말하세요(사용 횟수는 채점에 기록).</p>
             </div>
           )}
         </div>
