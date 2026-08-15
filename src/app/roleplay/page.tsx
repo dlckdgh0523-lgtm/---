@@ -481,18 +481,24 @@ export default function RoleplayPage() {
   }
 
   async function requestScore(lines: UtterLine[]) {
+    // region/placeId는 ref에서 — 음성 경로의 stale closure로 빈 값이 가 'bad params'(400)가 나던 문제 방지.
+    const p = turnParamsRef.current;
     try {
       const res = await fetch('/api/llm/roleplay/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          region,
-          placeId: place?.id,
+          region: p.region,
+          placeId: p.placeId,
           hintCount,
           transcript: lines.map((l) => ({ speaker: l.speaker, text: l.text, lowConfidence: l.lowConfidence ?? false })),
         }),
       });
-      setScore((await res.json()) as ScoreResult);
+      if (!res.ok) {
+        setScore({ status: 'error', message: `채점 요청 실패 (상태 ${res.status})` });
+      } else {
+        setScore((await res.json()) as ScoreResult);
+      }
     } catch {
       setScore({ status: 'error', message: '채점 요청 실패' });
     }

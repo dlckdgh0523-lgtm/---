@@ -49,10 +49,13 @@ export interface DifficultyRule {
   chatOnlyEndTurns: number; // 용건 없는 잡담이 이 턴 수에 도달하면 종료
 }
 
+// chatOnlyEndTurns: 용건(보험·보장·재무 등 키워드)을 안 꺼내도 이 턴 수까지는 대화를 이어간다.
+// 값이 낮으면 소프트 접근(인사·근황)만 하다 금방 끊긴다 — 연습 공간을 넓히려 상향(2026-08-16).
+// maxSentences도 보통을 1→2로 늘려 답이 지나치게 단답이 되지 않게 함. 전부 [미검증 가설] 상수.
 export const DIFFICULTY_RULES: Record<Difficulty, DifficultyRule> = {
-  easy: { maxSentences: 3, canAskFirst: true, providesInfoBeforePurpose: true, firstNTurnsReject: 0, chatOnlyEndTurns: 5 },
-  normal: { maxSentences: 1, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 0, chatOnlyEndTurns: 3 },
-  hard: { maxSentences: 1, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 2, chatOnlyEndTurns: 2 },
+  easy: { maxSentences: 3, canAskFirst: true, providesInfoBeforePurpose: true, firstNTurnsReject: 0, chatOnlyEndTurns: 8 },
+  normal: { maxSentences: 2, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 0, chatOnlyEndTurns: 6 },
+  hard: { maxSentences: 1, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 2, chatOnlyEndTurns: 4 },
 };
 
 /**
