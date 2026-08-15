@@ -50,7 +50,15 @@ export async function GET(req: NextRequest) {
       `http://openapi.seoul.go.kr:8088/${key}/json/citydata/1/5/${encodeURIComponent(area)}`,
       { signal: AbortSignal.timeout(10000) },
     );
-    const json = await res.json();
+    const text = await res.text();
+    // 서울시 API는 오류 시 /json/ 경로에도 XML(<RESULT><CODE>..)을 반환한다.
+    // (INFO-100 인증키 오류, ERROR-337 일별 호출제한 초과 등) → JSON.parse가 깨지므로 코드를 추출해 표시.
+    if (text.trimStart().startsWith('<')) {
+      const code = text.match(/<CODE>([^<]*)<\/CODE>/)?.[1] ?? '';
+      const msg = text.match(/<MESSAGE>([^<]*)<\/MESSAGE>/)?.[1] ?? '';
+      return Response.json({ status: 'error', areaName: area, message: `서울시 API 오류 ${code} ${msg}`.trim() } satisfies CityLookup);
+    }
+    const json = JSON.parse(text);
     const city = json?.CITYDATA;
     const live = Array.isArray(city?.LIVE_PPLTN_STTS) ? city.LIVE_PPLTN_STTS[0] : city?.LIVE_PPLTN_STTS;
     if (!live) throw new Error(json?.RESULT?.['RESULT.MESSAGE'] ?? 'LIVE_PPLTN_STTS 없음');
