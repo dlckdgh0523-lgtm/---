@@ -3,7 +3,7 @@
 > 인톡 | 이창호 사전과제
 >
 > 저연차 보험설계사의 두 실패 지점, 접점 고갈(앞단)과 환수 노출(뒷단)을 다루는 실제로 돌아가는 도구입니다.
-> 배포 https://sales-changho.vercel.app · 저장소 github.com/dlckdgh0523-lgtm
+> 배포 https://sales-changho.vercel.app · 저장소 https://github.com/dlckdgh0523-lgtm/---
 
 ## 0. 이게 무엇인가 (30초 요약)
 
@@ -479,7 +479,7 @@ CI 연동. `.github/workflows/eval.yml`은 API 비용이 발생하므로 매 pus
 
 ### 배포·저장소·데모 계정
 - 배포 URL: https://sales-changho.vercel.app
-- 저장소: https://github.com/dlckdgh0523-lgtm
+- 저장소: https://github.com/dlckdgh0523-lgtm/---
 - 평가자용 데모 관리자 계정: `admin@admin.com` / `admin123`. 로그인 후 헤더의 빨간 관리자 링크나 `/admin`으로 들어갑니다. 관리자 화면에는 집계·운영 지표만 있고 개인 식별값과 금액은 없습니다(금액은 클라이언트 암호화라 관리자도 열 수 없습니다). 데모용 약한 비밀번호이며 실사용 계정이 아닙니다. 앱 전체는 상단 시작하기로 직접 회원가입해도 볼 수 있습니다.
 
 ---
