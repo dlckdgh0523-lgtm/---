@@ -77,6 +77,7 @@ export default function RoleplayPage() {
 
   const [liveStatus, setLiveStatus] = useState<LiveStatus>('listening');
   const [interim, setInterim] = useState('');
+  const [speakingText, setSpeakingText] = useState(''); // 현재 TTS 재생 중인 문장 (강조용)
   const [micLevel, setMicLevel] = useState(0);
   const [transcript, setTranscript] = useState<UtterLine[]>([]);
   const [hintCount, setHintCount] = useState(0);
@@ -94,8 +95,7 @@ export default function RoleplayPage() {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const utterFinalsRef = useRef<{ text: string; confidence: number }[]>([]);
   const transcriptRef = useRef<UtterLine[]>([]);
-  const ttsQueueRef = useRef<string[]>([]);
-  const streamDoneRef = useRef(true);
+  const busyRef = useRef(false); // 생각 중/말하는 중 — STT 재시작·이중 전송 차단
   const endedRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -127,7 +127,18 @@ export default function RoleplayPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [transcript, interim, liveStatus]);
 
-  // ---------- TTS: 문장 단위 큐 재생 (긴 텍스트 중단 이슈 회피) ----------
+  // ---------- TTS ----------
+  // 음성 목록은 비동기 로드 — 첫 호출 시 빈 배열일 수 있어 voiceschanged로 갱신 (A-2).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const load = () => window.speechSynthesis.getVoices();
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   const pickKoVoice = useCallback((): SpeechSynthesisVoice | null => {
     const voices = window.speechSynthesis.getVoices();
     return voices.find((v) => v.lang.startsWith('ko')) ?? null; // 없으면 기본 voice 폴백
@@ -159,8 +170,8 @@ export default function RoleplayPage() {
       if (speakingRef.current) {
         if (!bargeInRef.current) return;
         window.speechSynthesis.cancel();
-        ttsQueueRef.current = [];
         speakingRef.current = false;
+        setSpeakingText('');
         setLiveStatus('listening');
       }
       let interimText = '';
@@ -178,11 +189,12 @@ export default function RoleplayPage() {
       silenceTimerRef.current = setTimeout(() => commitUtterance(), SILENCE_END_MS);
     };
     rec.onend = () => {
-      // 크롬은 무음이 이어지면 인식을 자동 종료한다 → 세션이 살아있으면 재시작
-      if (sessionActiveRef.current && !speakingRef.current) {
+      // 크롬은 무음이 이어지면 인식을 자동 종료한다 → '듣는 중'일 때만 재시작.
+      // 생각 중/말하는 중(busyRef)에는 재시작하지 않는다 — 이중 전송·에코 방지.
+      if (sessionActiveRef.current && !speakingRef.current && !busyRef.current) {
         setTimeout(() => {
           try {
-            if (sessionActiveRef.current && !speakingRef.current) rec.start();
+            if (sessionActiveRef.current && !speakingRef.current && !busyRef.current) rec.start();
           } catch {
             /* 이미 시작됨 등 */
           }
@@ -205,47 +217,62 @@ export default function RoleplayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceMode]);
 
+  // 문장 배열을 순서대로 읽는다. TTS가 차단(제스처 없음)되거나 무음이어도 멈추지 않도록
+  // 문장마다 안전 타이머로 다음으로 넘어간다 (A-2). 텍스트는 이미 화면에 떠 있으므로 소리는 보조.
   const speakSentences = useCallback(
-    (onAllDone: () => void) => {
-      const next = () => {
-        const sentence = ttsQueueRef.current.shift();
-        if (sentence === undefined) {
-          if (streamDoneRef.current) {
-            speakingRef.current = false;
-            onAllDone();
-          } else {
-            setTimeout(next, 120); // 스트림이 아직 문장을 만드는 중 — 대기
-          }
-          return;
-        }
-        const u = new SpeechSynthesisUtterance(sentence);
-        u.lang = 'ko-KR';
-        const voice = pickKoVoice();
-        if (voice) u.voice = voice;
-        u.onend = next;
-        u.onerror = next;
-        window.speechSynthesis.speak(u);
-      };
+    (sentences: string[], onAllDone: () => void) => {
       speakingRef.current = true;
       if (!bargeInRef.current) stopRecognition(); // 에코 방지: 재생 중 STT 중지
       setLiveStatus('speaking');
-      next();
+      let i = 0;
+      const step = () => {
+        if (i >= sentences.length) {
+          speakingRef.current = false;
+          setSpeakingText('');
+          onAllDone();
+          return;
+        }
+        const sentence = sentences[i++];
+        setSpeakingText(sentence); // 현재 재생 문장 강조
+        let advanced = false;
+        const go = () => {
+          if (advanced) return;
+          advanced = true;
+          step();
+        };
+        try {
+          const u = new SpeechSynthesisUtterance(sentence);
+          u.lang = 'ko-KR';
+          const voice = pickKoVoice();
+          if (voice) u.voice = voice;
+          u.onend = go;
+          u.onerror = go;
+          window.speechSynthesis.speak(u);
+        } catch {
+          go();
+          return;
+        }
+        // 안전 타이머: onend가 오지 않거나(무음/차단) 유실돼도 대화가 멈추지 않게 진행.
+        // 실제 발화는 이보다 빨리 끝나 onend가 먼저 진행한다.
+        setTimeout(go, Math.max(2000, sentence.length * 220 + 1500));
+      };
+      step();
     },
     [pickKoVoice, stopRecognition],
   );
 
-  // ---------- 턴 전송 (스트리밍 수신 → 문장 큐) ----------
+  // ---------- 턴 전송 ----------
+  // route는 완결된 텍스트(비스트리밍)를 반환한다. 스트림 리더 대신 res.text()로 받아
+  // 단계별로 로깅하고, 사장님 대사는 음성/텍스트 모드 공통으로 항상 말풍선에 남긴다(A-1·A-5).
   const sendTurn = useCallback(
     async (userText: string) => {
       setLiveStatus('thinking');
       setInterim('');
+      busyRef.current = true; // 생각 중 — STT 재시작/이중 전송 차단
       const history = transcriptRef.current.map((l) => ({ speaker: l.speaker, text: l.text }));
-      streamDoneRef.current = false;
-      ttsQueueRef.current = [];
-      let ownerText = '';
-      let started = false;
 
       const finishTurn = () => {
+        busyRef.current = false;
         if (endedRef.current || transcriptRef.current.filter((l) => l.speaker === 'user').length >= MAX_USER_TURNS) {
           void finishSession();
           return;
@@ -255,86 +282,80 @@ export default function RoleplayPage() {
         if (voiceMode) startRecognition();
       };
 
+      let raw = '';
+      let status = 0;
       try {
         const res = await fetch('/api/llm/roleplay/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ region, placeId: place?.id, difficulty, ageIdx, temperIdx, history, userText }),
         });
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('no stream');
-        const decoder = new TextDecoder();
-        let buf = '';
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          let idx: number;
-          while ((idx = buf.indexOf('\n')) >= 0) {
-            const line = buf.slice(0, idx).trim();
-            buf = buf.slice(idx + 1);
-            if (!line) continue;
-            if (line === '__DISABLED__') {
-              setNotice('ANTHROPIC_API_KEY 대기 중 — 키가 들어오면 대화가 활성화됩니다.');
-              sessionActiveRef.current = false;
-              setPhase('setup');
-              return;
-            }
-            if (line === '__RATELIMIT__') {
-              setNotice('오늘 대화 한도에 도달했습니다.');
-              void finishSession();
-              return;
-            }
-            if (line === '__ERROR__') {
-              setNotice('응답 생성에 실패했습니다. 한 번 더 말해보세요.');
-              finishTurn();
-              return;
-            }
-            if (line === '__END__') {
-              endedRef.current = true;
-              continue;
-            }
-            if (line === '__META__') {
-              // 서버가 메타 요청을 코드로 차단한 턴 — reply(앞 줄)는 이미 대사로 처리됨. 마커만 무시, 대화는 계속.
-              continue;
-            }
-            // 정상 문장 — 전사에 누적 + TTS 큐
-            ownerText = ownerText ? `${ownerText} ${line}` : line;
-            setTranscript((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.speaker === 'owner' && started) {
-                return [...prev.slice(0, -1), { ...last, text: ownerText }];
-              }
-              return [...prev, { speaker: 'owner', text: ownerText }];
-            });
-            ttsQueueRef.current.push(line);
-            if (!started) {
-              started = true;
-              if (voiceMode) speakSentences(finishTurn); // 첫 문장 완성 즉시 재생 시작
-            }
-          }
-        }
-        streamDoneRef.current = true;
-        // 사장님 대사를 transcriptRef에 즉시 반영 — setTranscript 커밋이 늦어 종료 시 마지막 대사가
-        // 채점 전사에서 누락되던 문제 방지 (특히 __END__로 바로 finishSession 되는 턴).
-        if (started && ownerText) {
-          const cur = transcriptRef.current;
-          const last = cur[cur.length - 1];
-          transcriptRef.current =
-            last?.speaker === 'owner'
-              ? [...cur.slice(0, -1), { ...last, text: ownerText }]
-              : [...cur, { speaker: 'owner', text: ownerText }];
-        }
-        if (!started) {
-          // 문장이 하나도 없었음 (전부 필터되었거나 빈 응답)
-          setNotice('사장님이 말없이 바라봅니다. 다시 말해보세요.');
-          finishTurn();
-        } else if (!voiceMode) {
-          finishTurn();
-        }
-      } catch {
-        streamDoneRef.current = true;
-        setNotice('네트워크 오류 — 다시 말해보세요.');
+        status = res.status;
+        raw = await res.text();
+      } catch (e) {
+        console.warn('[roleplay] fetch 실패:', e);
+        setNotice('네트워크 오류 — 사장님에게 말이 전달되지 않았습니다. 다시 시도하세요.');
+        finishTurn();
+        return;
+      }
+      console.log('[roleplay] sendTurn userText:', JSON.stringify(userText), '| status:', status, '| raw:', JSON.stringify(raw));
+
+      if (status !== 200) {
+        setNotice(`서버 오류(상태 ${status})로 응답을 받지 못했습니다. 다시 시도하세요.`);
+        finishTurn();
+        return;
+      }
+
+      const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+      console.log('[roleplay] 파싱된 라인:', lines);
+
+      if (lines.includes('__DISABLED__')) {
+        setNotice('ANTHROPIC_API_KEY 대기 중 — 키가 들어오면 대화가 활성화됩니다.');
+        busyRef.current = false;
+        sessionActiveRef.current = false;
+        setPhase('setup');
+        return;
+      }
+      if (lines.includes('__RATELIMIT__')) {
+        setNotice('오늘 대화 한도에 도달했습니다.');
+        busyRef.current = false;
+        void finishSession();
+        return;
+      }
+      if (lines.includes('__ERROR__')) {
+        setNotice('사장님 응답 생성에 실패했습니다(모델 오류). 한 번 더 말해보세요.');
+        finishTurn();
+        return;
+      }
+
+      const ended = lines.includes('__END__');
+      if (ended) endedRef.current = true;
+
+      // 대사 = 마커(__...__)를 제외한 라인들
+      const sentences = lines.filter((l) => !l.startsWith('__'));
+      const ownerText = sentences.join(' ');
+      const onlyEllipsis = sentences.length === 1 && sentences[0] === '...';
+      console.log('[roleplay] 사장님 문장:', sentences, '| ended:', ended, '| onlyEllipsis:', onlyEllipsis);
+
+      // A-3: 빈 응답 — 원인을 구분해 표시
+      if (sentences.length === 0 || onlyEllipsis) {
+        const reason = onlyEllipsis
+          ? '사장님 대답이 출력 필터에 전량 제거됐습니다(법령·금지 표현 등). 표현을 바꿔 다시 말해보세요.'
+          : '사장님 응답이 비어 있습니다(모델이 대사를 내지 않음). 다시 말해보세요.';
+        console.warn('[roleplay] 빈 사장님 응답 —', onlyEllipsis ? '필터 전량 제거' : '빈 응답', '| raw:', JSON.stringify(raw));
+        setNotice(reason);
+        finishTurn();
+        return;
+      }
+
+      // 사장님 대사를 화면에 남긴다 (음성·텍스트 공통, TTS와 무관)
+      const ownerLine: UtterLine = { speaker: 'owner', text: ownerText };
+      setTranscript((prev) => [...prev, ownerLine]);
+      transcriptRef.current = [...transcriptRef.current, ownerLine];
+
+      if (voiceMode) {
+        speakSentences(sentences, finishTurn); // 소리는 보조 — 실패해도 텍스트는 이미 떠 있다
+      } else {
         finishTurn();
       }
     },
@@ -343,6 +364,7 @@ export default function RoleplayPage() {
   );
 
   const commitUtterance = useCallback(() => {
+    if (busyRef.current) return; // 생각 중/말하는 중이면 새 발화를 보내지 않는다 (이중 전송 방지)
     const finals = utterFinalsRef.current;
     if (finals.length === 0) return;
     utterFinalsRef.current = [];
@@ -618,14 +640,28 @@ export default function RoleplayPage() {
       <div className="mx-auto max-w-lg">
         {placeBar}
         <div className="flex flex-col py-4">
-          {/* 상태 표시 (상단, 작게) */}
-          <div className="flex items-center justify-center gap-2 py-1">
-            <span className="text-2xl">{statusView.icon}</span>
-            <span className={`text-sm font-bold ${statusView.color}`}>{statusView.label}</span>
-            {voiceMode && (
-              <span className="ml-1 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-[#F2F4F6] align-middle">
+          {/* 상태 표시 — 듣는 중/생각 중/말하는 중을 색·형태·움직임으로 구분 (A-4) */}
+          <div className="flex flex-col items-center gap-1.5 py-1">
+            <div className="flex items-center gap-2">
+              <span className={liveStatus === 'thinking' ? 'animate-pulse text-2xl' : 'text-2xl'}>{statusView.icon}</span>
+              <span className={`text-sm font-bold ${statusView.color}`}>{statusView.label}</span>
+              {liveStatus === 'thinking' && (
+                <span className="flex gap-1">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500 [animation-delay:-0.2s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500 [animation-delay:-0.1s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" />
+                </span>
+              )}
+            </div>
+            {/* 듣는 중: 마이크 입력 레벨 실시간 — 소리 없이도 마이크가 살아있음을 보이게 */}
+            {voiceMode && liveStatus === 'listening' && (
+              <span className="inline-block h-1.5 w-40 overflow-hidden rounded-full bg-[#F2F4F6]">
                 <span className="block h-1.5 rounded-full bg-[#3182F6] transition-all duration-75" style={{ width: `${Math.round(micLevel * 100)}%` }} />
               </span>
+            )}
+            {/* 말하는 중: 현재 재생 문장 강조 — 소리가 안 들려도 어느 문장인지 보이게 */}
+            {liveStatus === 'speaking' && speakingText && (
+              <span className="max-w-md rounded-full bg-emerald-50 px-3 py-1 text-center text-xs text-emerald-700">🔊 {speakingText}</span>
             )}
           </div>
 
