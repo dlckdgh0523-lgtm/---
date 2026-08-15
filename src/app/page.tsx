@@ -54,7 +54,7 @@ export default function LandingPage() {
           진짜 내 돈은 얼마인가요?
         </h1>
         <p className={`mx-auto mt-5 max-w-xl text-lg leading-relaxed ${SUB}`}>
-          선지급 수수료는 아직 전부 내 돈이 아닙니다. 계약이 깨지면 환수로 돌아옵니다.
+          선지급 수수료는 아직 전부 내 돈이 아닙니다. 계약이 깨지면 환수로 돌아옵니다.{' '}
           <br className="hidden sm:block" />
           확정된 몫과 노출된 몫을 구분하고, 지금 수입이 끊겨도 몇 개월 버틸 수 있는지 확인하세요.
         </p>
