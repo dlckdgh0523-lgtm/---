@@ -364,12 +364,19 @@ export default function RoleplayPage() {
   );
 
   const commitUtterance = useCallback(() => {
-    if (busyRef.current) return; // 생각 중/말하는 중이면 새 발화를 보내지 않는다 (이중 전송 방지)
+    if (busyRef.current) {
+      console.log('[roleplay] commitUtterance 건너뜀 — busy(생각/말하는 중)');
+      return; // 생각 중/말하는 중이면 새 발화를 보내지 않는다 (이중 전송 방지)
+    }
     const finals = utterFinalsRef.current;
     if (finals.length === 0) return;
     utterFinalsRef.current = [];
     const text = finals.map((f) => f.text).join(' ').trim();
-    if (!text) return;
+    console.log('[roleplay] commitUtterance finals:', finals, '→ text:', JSON.stringify(text));
+    if (!text) {
+      console.log('[roleplay] commitUtterance 빈 텍스트 — 전송 안 함');
+      return;
+    }
     const avgConf = finals.reduce((s, f) => s + f.confidence, 0) / finals.length;
     const line: UtterLine = {
       speaker: 'user',
