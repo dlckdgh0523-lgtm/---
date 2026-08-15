@@ -380,12 +380,12 @@ export default function PlacesPage() {
               {building?.status === 'disabled' && <p className="mt-0.5 text-slate-400">건축물대장 API 키가 설정되지 않았습니다.</p>}
             </div>
 
-            {/* 음성 롤플레잉 진입 — 이 사업장 데이터로 페르소나 구성 */}
+            {/* 음성 롤플레잉 진입 — 방식 선택 화면을 거친다(순차 vs 직결) */}
             <Link
-              href={`/roleplay?region=${regionCode}&place=${encodeURIComponent(selected.id)}`}
+              href={`/voice-select?region=${regionCode}&place=${encodeURIComponent(selected.id)}`}
               className="mt-3 block rounded-lg bg-[#191F28] p-3 text-center text-sm font-bold text-white transition hover:bg-[#333B48]"
             >
-              🎤 이 사장님과 방문 상담 연습 (음성 롤플레잉)
+              🎤 이 사장님과 방문 상담 연습 (음성)
             </Link>
 
             {/* 접근 시나리오 생성 (LLM 용도 1) — 숫자·법령은 코드가 통제, LLM은 문장만 */}
