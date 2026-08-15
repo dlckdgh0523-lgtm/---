@@ -58,11 +58,11 @@ export default async function VoiceSelectPage({
         </Link>
       </section>
 
-      {/* 방식 B — 사용 불가 */}
-      <section className="rounded-2xl border border-[#EDF0F3] bg-white p-5 opacity-90">
+      {/* 방식 B — 사용 가능 (ElevenLabs Conversational AI) */}
+      <section className="rounded-2xl border border-emerald-300 bg-emerald-50/40 p-5">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-[#8B95A1]">방식 B · 음성-음성 직결 (Realtime)</p>
-          <span className="rounded-full bg-[#F2F4F6] px-2.5 py-0.5 text-xs font-semibold text-[#8B95A1]">사용 불가</span>
+          <p className="text-sm font-bold text-emerald-700">방식 B · 음성-음성 직결 (ElevenLabs)</p>
+          <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white">실험 · 사용 가능</span>
         </div>
         <p className={`mt-2 text-sm leading-relaxed ${SUB}`}>
           음성을 텍스트로 바꾸지 않고 모델에 직접 보내고, 음성으로 답을 받는 방식입니다. 대화가 자연스럽고 지연이
@@ -70,17 +70,18 @@ export default async function VoiceSelectPage({
         </p>
         <ul className={`mt-2 space-y-1 text-sm ${SUB}`}>
           <li>· 안 됨: 채점 · 가드 필터 · 페르소나 상태 관리</li>
-          <li>· 끼어들기: 네이티브(설계상)</li>
-          <li>· 첫 응답 지연: 미측정</li>
+          <li>· 끼어들기: 네이티브</li>
+          <li>· 무료 대화 시간: 월 15분 (ElevenLabs 무료 플랜)</li>
         </ul>
-        <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-          현재 사용할 수 없습니다. ElevenLabs Conversational AI를 쓰려면 <b>convai(대화형 AI) 권한이 포함된 API 키</b>가
-          필요한데, 제공된 키가 TTS 전용 스코프라 <code>401 missing_permissions</code>가 반환됐습니다. 키에 Conversational
-          AI 권한을 추가하면 이 방식이 활성화됩니다.
-        </div>
-        <span className="mt-3 inline-block cursor-not-allowed rounded-xl bg-[#F2F4F6] px-5 py-2.5 text-sm font-semibold text-[#B0B8C1]">
-          이 방식으로 연습 (사용 불가)
-        </span>
+        <Link
+          href={`/voice-direct?region=${encodeURIComponent(region)}&place=${encodeURIComponent(place)}`}
+          className="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white"
+        >
+          이 방식으로 연습 →
+        </Link>
+        <p className="mt-2 text-xs text-slate-400">
+          키/에이전트가 설정돼 있지 않으면 시작 시 그 사유를 표시하고 이 화면으로 되돌립니다.
+        </p>
       </section>
 
       <div className="pt-1">
