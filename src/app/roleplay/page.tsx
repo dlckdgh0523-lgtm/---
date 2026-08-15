@@ -43,6 +43,7 @@ interface SRLike {
   start: () => void;
   stop: () => void;
   abort: () => void;
+  onstart: (() => void) | null;
   onresult: ((e: SREvent) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
@@ -78,7 +79,7 @@ export default function RoleplayPage() {
   const [liveStatus, setLiveStatus] = useState<LiveStatus>('listening');
   const [interim, setInterim] = useState('');
   const [speakingText, setSpeakingText] = useState(''); // 현재 TTS 재생 중인 문장 (강조용)
-  const [micLevel, setMicLevel] = useState(0);
+  const [dbgLines, setDbgLines] = useState<string[]>([]); // 화면 디버그 패널 (음성 STT 진단)
   const [transcript, setTranscript] = useState<UtterLine[]>([]);
   const [hintCount, setHintCount] = useState(0);
   const [hints, setHints] = useState<string[] | null>(null);
@@ -97,8 +98,7 @@ export default function RoleplayPage() {
   const transcriptRef = useRef<UtterLine[]>([]);
   const busyRef = useRef(false); // 생각 중/말하는 중 — STT 재시작·이중 전송 차단
   const endedRef = useRef(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const lastInterimRef = useRef(''); // 최신 interim — final이 안 와도 발화를 살리는 폴백
   const threadRef = useRef<HTMLDivElement | null>(null);
   // 턴 요청 파라미터를 ref로 보관 — 음성 경로의 stale closure(startRecognition이 첫 렌더의
   // sendTurn을 붙듦)로 region/placeId가 비어 400이 나던 문제 방지. 항상 최신값을 전송한다.
@@ -154,6 +154,12 @@ export default function RoleplayPage() {
     return voices.find((v) => v.lang.startsWith('ko')) ?? null; // 없으면 기본 voice 폴백
   }, []);
 
+  // 화면 디버그 로그 — 콘솔을 안 봐도 음성 단계가 어디서 멈추는지 보이게 (임시 진단용)
+  const dbg = useCallback((msg: string) => {
+    console.log('[roleplay]', msg);
+    setDbgLines((prev) => [...prev.slice(-24), msg]);
+  }, []);
+
   const stopRecognition = useCallback(() => {
     try {
       recognitionRef.current?.abort();
@@ -163,9 +169,15 @@ export default function RoleplayPage() {
   }, []);
 
   const startRecognition = useCallback(() => {
-    if (!sessionActiveRef.current || !voiceMode) return;
+    if (!sessionActiveRef.current || !voiceMode) {
+      dbg(`startRecognition 무시 (active=${sessionActiveRef.current}, voiceMode=${voiceMode})`);
+      return;
+    }
     const Ctor = getSRCtor();
-    if (!Ctor) return;
+    if (!Ctor) {
+      dbg('SpeechRecognition 미지원');
+      return;
+    }
     try {
       recognitionRef.current?.abort();
     } catch {
@@ -175,6 +187,7 @@ export default function RoleplayPage() {
     rec.lang = 'ko-KR';
     rec.continuous = true;
     rec.interimResults = true;
+    rec.onstart = () => dbg('SR onstart — 인식 시작됨');
     rec.onresult = (e) => {
       // TTS 재생 중 입력: barge-in OFF면 무시(에코 방지), ON이면 끼어들기
       if (speakingRef.current) {
@@ -185,23 +198,31 @@ export default function RoleplayPage() {
         setLiveStatus('listening');
       }
       let interimText = '';
+      let gotFinal = false;
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
         if (res.isFinal) {
+          gotFinal = true;
           utterFinalsRef.current.push({ text: res[0].transcript.trim(), confidence: res[0].confidence ?? 0 });
         } else {
           interimText += res[0].transcript;
         }
       }
+      if (interimText) lastInterimRef.current = interimText;
+      dbg(`SR onresult — final=${gotFinal} interim="${interimText.slice(0, 30)}" finals=${utterFinalsRef.current.length}`);
       setInterim(interimText || utterFinalsRef.current.map((f) => f.text).join(' '));
       // 무음 타이머 재설정 — onspeechend에 의존하지 않는다 [미검증 가설: SILENCE_END_MS]
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = setTimeout(() => commitUtterance(), SILENCE_END_MS);
+      silenceTimerRef.current = setTimeout(() => {
+        dbg('무음 타이머 발화 → commitUtterance');
+        commitUtterance();
+      }, SILENCE_END_MS);
     };
     rec.onend = () => {
+      const willRestart = sessionActiveRef.current && !speakingRef.current && !busyRef.current;
+      dbg(`SR onend — 재시작=${willRestart} (active=${sessionActiveRef.current} speaking=${speakingRef.current} busy=${busyRef.current})`);
       // 크롬은 무음이 이어지면 인식을 자동 종료한다 → '듣는 중'일 때만 재시작.
-      // 생각 중/말하는 중(busyRef)에는 재시작하지 않는다 — 이중 전송·에코 방지.
-      if (sessionActiveRef.current && !speakingRef.current && !busyRef.current) {
+      if (willRestart) {
         setTimeout(() => {
           try {
             if (sessionActiveRef.current && !speakingRef.current && !busyRef.current) rec.start();
@@ -212,20 +233,27 @@ export default function RoleplayPage() {
       }
     };
     rec.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      dbg(`SR onerror — code=${e.error}`);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') {
         setVoiceMode(false);
-        setNotice('마이크를 사용할 수 없어 텍스트 모드로 전환했습니다. 기능은 동일합니다.');
+        setNotice(
+          e.error === 'audio-capture'
+            ? '마이크를 잡지 못했습니다(다른 앱이 마이크를 쓰고 있을 수 있음). 텍스트 모드로 전환했습니다.'
+            : '마이크 권한이 없어 텍스트 모드로 전환했습니다. 기능은 동일합니다.',
+        );
         sessionActiveRef.current = true;
       }
+      // no-speech / network / aborted 는 onend에서 재시작으로 회복 (로그만 남긴다)
     };
     recognitionRef.current = rec;
     try {
       rec.start();
-    } catch {
-      /* noop */
+      dbg('rec.start() 호출됨');
+    } catch (err) {
+      dbg(`rec.start() 예외: ${err instanceof Error ? err.message : 'unknown'}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceMode]);
+  }, [voiceMode, dbg]);
 
   // 문장 배열을 순서대로 읽는다. TTS가 차단(제스처 없음)되거나 무음이어도 멈추지 않도록
   // 문장마다 안전 타이머로 다음으로 넘어간다 (A-2). 텍스트는 이미 화면에 떠 있으므로 소리는 보조.
@@ -378,19 +406,25 @@ export default function RoleplayPage() {
 
   const commitUtterance = useCallback(() => {
     if (busyRef.current) {
-      console.log('[roleplay] commitUtterance 건너뜀 — busy(생각/말하는 중)');
+      dbg('commitUtterance 건너뜀 — busy(생각/말하는 중)');
       return; // 생각 중/말하는 중이면 새 발화를 보내지 않는다 (이중 전송 방지)
     }
     const finals = utterFinalsRef.current;
-    if (finals.length === 0) return;
+    // final이 하나도 없어도 최신 interim이 있으면 그걸로 발화를 살린다
+    // (브라우저가 isFinal을 안 주는 경우 대비 — 응답 없음 증상 방지)
+    let text = finals.map((f) => f.text).join(' ').trim();
+    if (!text && lastInterimRef.current.trim()) {
+      text = lastInterimRef.current.trim();
+      dbg(`commitUtterance — final 없음, interim 사용: "${text.slice(0, 30)}"`);
+    }
     utterFinalsRef.current = [];
-    const text = finals.map((f) => f.text).join(' ').trim();
-    console.log('[roleplay] commitUtterance finals:', finals, '→ text:', JSON.stringify(text));
+    lastInterimRef.current = '';
+    dbg(`commitUtterance → text="${text.slice(0, 40)}" (finals=${finals.length})`);
     if (!text) {
-      console.log('[roleplay] commitUtterance 빈 텍스트 — 전송 안 함');
+      dbg('commitUtterance 빈 텍스트 — 전송 안 함');
       return;
     }
-    const avgConf = finals.reduce((s, f) => s + f.confidence, 0) / finals.length;
+    const avgConf = finals.length ? finals.reduce((s, f) => s + f.confidence, 0) / finals.length : 0.5;
     const line: UtterLine = {
       speaker: 'user',
       text,
@@ -404,40 +438,18 @@ export default function RoleplayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendTurn, stopRecognition]);
 
-  // ---------- 마이크 레벨 시각화 ----------
-  const startMicMeter = useCallback(async (): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const loop = () => {
-        if (!sessionActiveRef.current) return;
-        analyser.getByteTimeDomainData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) {
-          const v = (data[i] - 128) / 128;
-          sum += v * v;
-        }
-        setMicLevel(Math.min(1, Math.sqrt(sum / data.length) * 4));
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
   // ---------- 세션 시작/종료 ----------
-  async function startSession() {
+  // 별도 getUserMedia 마이크 미터는 제거했다 — SpeechRecognition과 같은 마이크를 두 경로가
+  // 동시에 잡으면 STT가 오디오를 못 받아 결과가 안 나오는 충돌 가능성(레벨은 움직이지만 인식은
+  // 죽는 증상)이 있었다. 이제 마이크는 SpeechRecognition만 사용한다. 권한 요청도 SR이 한다.
+  function startSession() {
     setNotice('');
+    setDbgLines([]);
     endedRef.current = false;
+    busyRef.current = false; // 이전 세션의 잔여 busy 초기화 (조기 리턴 방지)
+    speakingRef.current = false;
+    utterFinalsRef.current = [];
+    lastInterimRef.current = '';
     setTranscript([]);
     transcriptRef.current = [];
     setHintCount(0);
@@ -446,12 +458,7 @@ export default function RoleplayPage() {
     setPhase('live');
     setLiveStatus('listening');
     if (voiceMode && srSupported) {
-      const micOk = await startMicMeter();
-      if (!micOk) {
-        setVoiceMode(false);
-        setNotice('마이크 권한이 거부되어 텍스트 모드로 시작합니다. 기능은 동일합니다.');
-        return;
-      }
+      dbg('세션 시작(음성) — SpeechRecognition 시작');
       window.speechSynthesis.getVoices(); // voice 목록 미리 로드
       startRecognition();
     }
@@ -459,10 +466,10 @@ export default function RoleplayPage() {
 
   async function finishSession() {
     sessionActiveRef.current = false;
+    busyRef.current = false;
+    speakingRef.current = false;
     stopRecognition();
     window.speechSynthesis.cancel();
-    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-    void audioCtxRef.current?.close();
     const lines = transcriptRef.current;
     if (lines.filter((l) => l.speaker === 'user').length === 0) {
       setPhase('setup');
@@ -474,18 +481,24 @@ export default function RoleplayPage() {
   }
 
   async function requestScore(lines: UtterLine[]) {
+    // region/placeId는 ref에서 — 음성 경로의 stale closure로 빈 값이 가 'bad params'(400)가 나던 문제 방지.
+    const p = turnParamsRef.current;
     try {
       const res = await fetch('/api/llm/roleplay/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          region,
-          placeId: place?.id,
+          region: p.region,
+          placeId: p.placeId,
           hintCount,
           transcript: lines.map((l) => ({ speaker: l.speaker, text: l.text, lowConfidence: l.lowConfidence ?? false })),
         }),
       });
-      setScore((await res.json()) as ScoreResult);
+      if (!res.ok) {
+        setScore({ status: 'error', message: `채점 요청 실패 (상태 ${res.status})` });
+      } else {
+        setScore((await res.json()) as ScoreResult);
+      }
     } catch {
       setScore({ status: 'error', message: '채점 요청 실패' });
     }
@@ -519,7 +532,6 @@ export default function RoleplayPage() {
       /* noop */
     }
     if (typeof window !== 'undefined') window.speechSynthesis.cancel();
-    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
   if (authStatus !== 'ready') return null;
@@ -673,10 +685,11 @@ export default function RoleplayPage() {
                 </span>
               )}
             </div>
-            {/* 듣는 중: 마이크 입력 레벨 실시간 — 소리 없이도 마이크가 살아있음을 보이게 */}
+            {/* 듣는 중: 펄스 표시 (마이크 레벨은 STT 동작 증거가 아니므로 실레벨 대신 상태만 표시) */}
             {voiceMode && liveStatus === 'listening' && (
-              <span className="inline-block h-1.5 w-40 overflow-hidden rounded-full bg-[#F2F4F6]">
-                <span className="block h-1.5 rounded-full bg-[#3182F6] transition-all duration-75" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+              <span className="flex items-center gap-1.5 text-xs text-[#3182F6]">
+                <span className="h-2 w-2 animate-ping rounded-full bg-[#3182F6]" />
+                말하세요 — 듣고 있습니다
               </span>
             )}
             {/* 말하는 중: 현재 재생 문장 강조 — 소리가 안 들려도 어느 문장인지 보이게 */}
@@ -771,6 +784,20 @@ export default function RoleplayPage() {
               ))}
               <p className="text-xs text-slate-400">힌트는 참고용입니다. 그대로 쓰기보다 본인 말로 바꿔 말하세요(사용 횟수는 채점에 기록).</p>
             </div>
+          )}
+
+          {/* 음성 STT 진단 패널 — 어느 단계에서 멈추는지 화면에서 보이게 (임시) */}
+          {voiceMode && (
+            <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-2 text-left">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-500">음성 진단 로그 ({dbgLines.length})</summary>
+              <div className="mt-2 max-h-40 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-600">
+                {dbgLines.length === 0 ? (
+                  <p className="text-slate-400">아직 로그 없음 — 말을 걸면 여기에 SR 이벤트가 쌓입니다.</p>
+                ) : (
+                  dbgLines.map((l, i) => <div key={i}>· {l}</div>)
+                )}
+              </div>
+            </details>
           )}
         </div>
       </div>

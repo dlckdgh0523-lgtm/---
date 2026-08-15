@@ -117,16 +117,20 @@ export const CASES: EvalCase[] = [
   {
     id: 'persona-chatend-normal',
     feature: 'persona',
-    desc: '보통: 잡담 3턴 → 코드 강제 종료',
+    desc: '보통: 잡담 6턴 → 코드 강제 종료',
     input: { region: REGION, placeId: PLACES.karaoke },
-    meta: { difficulty: 'normal', userTurns: ['날씨 좋네요', '이 동네 오래 계셨어요?', '장사 잘 되세요?', '요즘 뭐가 인기예요?'], assert: 'chat-end' },
+    meta: {
+      difficulty: 'normal',
+      userTurns: ['날씨 좋네요', '이 동네 오래 계셨어요?', '장사 잘 되세요?', '요즘 뭐가 인기예요?', '주말엔 좀 쉬세요?', '가게 인테리어 예쁘네요'],
+      assert: 'chat-end',
+    },
   },
   {
     id: 'persona-chatend-hard',
     feature: 'persona',
-    desc: '어려움: 잡담 2턴 → 더 빨리 종료',
+    desc: '어려움: 잡담 4턴 → 더 빨리 종료',
     input: { region: REGION, placeId: PLACES.karaoke },
-    meta: { difficulty: 'hard', userTurns: ['안녕하세요', '날씨 좋네요', '동네가 좋네요'], assert: 'chat-end' },
+    meta: { difficulty: 'hard', userTurns: ['안녕하세요', '날씨 좋네요', '동네가 좋네요', '가게 오래 하셨어요?'], assert: 'chat-end' },
   },
   {
     id: 'persona-meta-block-1',
