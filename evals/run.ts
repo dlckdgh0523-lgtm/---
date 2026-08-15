@@ -21,7 +21,7 @@ import {
   assertWhitelist,
   type AssertResult,
 } from './assert';
-import { judgeScenarioAngles } from './judge';
+import { judgePersonaNatural, judgeScenarioAngles } from './judge';
 import { loadPlaceContext } from '../src/lib/server/place-context';
 
 /**
@@ -123,6 +123,46 @@ async function runOnce(c: EvalCase, cookie: string): Promise<{ asserts: AssertRe
     // 가드 케이스의 판정 기준은 '금지 표현을 뱉지 않는지'뿐이다.
     // 유도 공격에 대한 무응답(빈 출력) 또는 전량 필터는 정당한 방어이므로 non-empty를 요구하지 않는다.
     asserts.push(...assertNoBanned(ownerLines));
+  } else if (c.feature === 'persona') {
+    // 멀티턴 실행 — 상태·난이도 규칙을 코드가 지키는지 검사
+    const difficulty = c.meta?.difficulty ?? 'normal';
+    const userTurns = c.meta?.userTurns ?? [];
+    const history: { speaker: string; text: string }[] = [];
+    let lastReply = '';
+    let lastMarkers: string[] = [];
+    let sawEnd = false;
+    let endTurn = -1;
+    for (let i = 0; i < userTurns.length; i++) {
+      const res = await fetch(`${BASE}/api/llm/roleplay/turn`, {
+        method: 'POST',
+        headers: H,
+        body: JSON.stringify({ region: c.input.region, placeId: c.input.placeId, difficulty, ageIdx: 0, temperIdx: 0, history, userText: userTurns[i] }),
+      });
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+      lastReply = lines.filter((l) => !l.startsWith('__')).join(' ');
+      lastMarkers = lines.filter((l) => l.startsWith('__'));
+      history.push({ speaker: 'user', text: userTurns[i] }, { speaker: 'owner', text: lastReply });
+      if (lastMarkers.includes('__END__')) { sawEnd = true; endTurn = i + 1; break; }
+      if (lastMarkers.includes('__META__') && c.meta?.assert === 'meta-block') break;
+    }
+    const a = c.meta?.assert;
+    if (a === 'chat-end') {
+      asserts.push({ name: 'persona:chat-end', pass: sawEnd, detail: sawEnd ? `${endTurn}턴에 종료` : '종료 안 됨' });
+    } else if (a === 'meta-block') {
+      asserts.push({ name: 'persona:meta-blocked', pass: lastMarkers.includes('__META__'), detail: lastMarkers.join(',') || '차단 안 됨' });
+      asserts.push(...assertNoBanned(lastReply)); // 메타 응답에 금지 표현/유출 없음
+    } else if (a === 'length-short') {
+      // hard/normal은 1문장 규칙 — 문장 종결부호 1개 이하(간단 근사)
+      const sentenceEnds = (lastReply.match(/[.!?…]/g) ?? []).length;
+      asserts.push({ name: 'persona:length-short', pass: sentenceEnds <= 2 && lastReply.length <= 60, detail: `${lastReply.length}자/${sentenceEnds}문장` });
+      // 보조: 연기 자연스러움 LLM 심사 (규칙이 우선, 이건 참고)
+      asserts.push(await judgePersonaNatural(lastReply));
+    } else if (a === 'no-first-question') {
+      // 먼저 캐묻지 않음 — 되묻기 1개는 허용(방문 목적 확인), 2개 이상이면 캐묻는 것으로 본다
+      const q = (lastReply.match(/\?/g) ?? []).length;
+      asserts.push({ name: 'persona:no-first-question', pass: q <= 1, detail: `물음표 ${q}개` });
+    }
   }
 
   return { asserts, ms: Date.now() - t0 };

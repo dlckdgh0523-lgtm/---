@@ -288,6 +288,10 @@ export default function RoleplayPage() {
               endedRef.current = true;
               continue;
             }
+            if (line === '__META__') {
+              // 서버가 메타 요청을 코드로 차단한 턴 — reply(앞 줄)는 이미 대사로 처리됨. 마커만 무시, 대화는 계속.
+              continue;
+            }
             // 정상 문장 — 전사에 누적 + TTS 큐
             ownerText = ownerText ? `${ownerText} ${line}` : line;
             setTranscript((prev) => {

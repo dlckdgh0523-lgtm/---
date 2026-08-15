@@ -340,11 +340,11 @@ export default function AdminPage() {
           </div>
         ) : (
           <p className="text-sm text-slate-400">
-            아직 실행 이력 없음 — <code>npm run eval</code>로 골든셋 24케이스를 3회씩 실행하면 결과가 여기 표시됩니다.
+            아직 실행 이력 없음 — <code>npm run eval</code>로 골든셋 30케이스를 3회씩 실행하면 결과가 여기 표시됩니다.
           </p>
         )}
         <p className="mt-2 text-xs text-slate-400">
-          ⚠️ 골든셋은 개발자 1인이 작성했고 현업 검증을 받지 않았습니다. 케이스 24건은 통계적 신뢰도가 낮아 회귀의
+          ⚠️ 골든셋은 개발자 1인이 작성했고 현업 검증을 받지 않았습니다. 케이스 30건은 통계적 신뢰도가 낮아 회귀의
           '방향'을 보는 용도입니다. LLM은 비결정적이라 각 케이스를 3회 실행해 "1회 통과"를 통과로 치지 않습니다.
         </p>
       </Section>

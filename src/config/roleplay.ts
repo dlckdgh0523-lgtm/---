@@ -37,6 +37,65 @@ export const HINT_PENALTY_CAP = 15;
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: '쉬움', normal: '보통', hard: '어려움' };
 
+/**
+ * 난이도를 형용사가 아니라 검사 가능한 규칙으로 정의한다 (2026-08-14 재설계).
+ * 임계값은 전부 [미검증 가설]. 상태 추적·종료 판단은 코드가 하고, 모델은 이 규칙을 따르는 대사만 생성한다.
+ */
+export interface DifficultyRule {
+  maxSentences: number; // 답변 문장 수 상한
+  canAskFirst: boolean; // 사용자보다 먼저 질문해도 되는가
+  providesInfoBeforePurpose: boolean; // 용건 전달 전에 정보(대답)를 제공하는가
+  firstNTurnsReject: number; // 첫 N턴은 거절 표현을 포함 (hard용, 0이면 없음)
+  chatOnlyEndTurns: number; // 용건 없는 잡담이 이 턴 수에 도달하면 종료
+}
+
+export const DIFFICULTY_RULES: Record<Difficulty, DifficultyRule> = {
+  easy: { maxSentences: 3, canAskFirst: true, providesInfoBeforePurpose: true, firstNTurnsReject: 0, chatOnlyEndTurns: 5 },
+  normal: { maxSentences: 1, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 0, chatOnlyEndTurns: 3 },
+  hard: { maxSentences: 1, canAskFirst: false, providesInfoBeforePurpose: false, firstNTurnsReject: 2, chatOnlyEndTurns: 2 },
+};
+
+/**
+ * 난이도별 few-shot 예시 — 작은 모델(haiku)에는 지시문보다 예시가 효과적.
+ * ⚠️ 전부 합성 예시다(실제 상담 데이터 아님). 페르소나 톤·길이·태도를 보여주는 용도.
+ */
+export const DIFFICULTY_FEWSHOT: Record<Difficulty, string> = {
+  easy: `설계사: 안녕하세요 사장님, 근처에서 일하는데 인사드리러 왔어요.
+사장님: 아 네, 어떤 일 하세요?
+설계사: 보험 쪽이에요. 요즘 가게는 좀 어떠세요?
+사장님: 그럭저럭이죠. 요즘 손님이 좀 줄어서 걱정이긴 해요.`,
+  normal: `설계사: 안녕하세요 사장님.
+사장님: 네, 무슨 일이세요?
+설계사: 근처 지나다 인사드리러 왔어요.
+사장님: 바쁜데요.`,
+  hard: `설계사: 안녕하세요, 잠깐 시간 되세요?
+사장님: 안 사요. 됐어요.
+설계사: 아 파는 거 아니고 인사만 드리려고요.
+사장님: 바빠요, 나중에요.`,
+};
+
+/**
+ * 메타 요청 패턴 — LLM 호출 전에 코드가 감지해 페르소나 고정 응답으로 차단한다.
+ * 모델이 매번 창의적으로 회피하게 할 이유가 없다. 감지 건수는 메트릭에 기록.
+ */
+export const META_PATTERNS: RegExp[] = [
+  /시스템\s*프롬프트/,
+  /프롬프트\s*(를\s*)?(보여|알려|뭐|출력|공개)/,
+  /(이전|앞선|지금까지).{0,6}(지시|명령|규칙).{0,4}(무시|잊)/,
+  /지시를?\s*무시/,
+  /너\s*(는\s*)?a?i\s*(지|잖|맞|아니)/i,
+  /챗봇|언어\s*모델|gpt|claude/i,
+  /개발자\s*모드|jailbreak|탈옥/i,
+  /역할\s*(을\s*)?(벗어|그만)|역할극\s*(그만|끝)/,
+];
+
+/** 메타 요청 감지 시 페르소나 고정 응답 (난이도 무관, 사장님답게 넘긴다) */
+export const META_RESPONSES: string[] = [
+  '무슨 말씀이신지... 저는 그런 거 잘 몰라요.',
+  '네? 갑자기 무슨 말씀이세요.',
+  '어유, 저는 장사밖에 몰라서요. 무슨 용건이신데요?',
+];
+
 /** 가상 설정 후보 — 클라이언트는 인덱스만 보내고 서버가 문자열로 변환 (프롬프트 인젝션 차단) */
 export const VIRTUAL_AGE_BANDS = ['30대', '40대', '50대', '60대'] as const;
 export const VIRTUAL_TEMPERS = ['무뚝뚝하지만 정 많음', '싹싹하지만 계산 빠름', '조심스럽고 신중함', '호탕하고 직설적'] as const;

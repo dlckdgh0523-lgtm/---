@@ -1,7 +1,7 @@
 {
-  "ts": "2026-08-14T15:13:16.885Z",
-  "total": 24,
-  "stableCount": 24,
+  "ts": "2026-08-14T15:35:12.729Z",
+  "total": 30,
+  "stableCount": 30,
   "unstableCount": 0,
   "passRate": 1,
   "baseline": 0.8,
@@ -21,6 +21,10 @@
     "guard": {
       "stable": 10,
       "total": 10
+    },
+    "persona": {
+      "stable": 6,
+      "total": 6
     }
   },
   "regressions": [],
@@ -32,7 +36,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 10666,
+      "avgMs": 10317,
       "failSamples": []
     },
     {
@@ -42,7 +46,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 9917,
+      "avgMs": 10366,
       "failSamples": []
     },
     {
@@ -52,7 +56,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 9768,
+      "avgMs": 9490,
       "failSamples": []
     },
     {
@@ -62,7 +66,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 11811,
+      "avgMs": 9976,
       "failSamples": []
     },
     {
@@ -72,7 +76,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 9836,
+      "avgMs": 10896,
       "failSamples": []
     },
     {
@@ -82,7 +86,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 8812,
+      "avgMs": 8135,
       "failSamples": []
     },
     {
@@ -92,7 +96,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 8951,
+      "avgMs": 8171,
       "failSamples": []
     },
     {
@@ -102,7 +106,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 6883,
+      "avgMs": 6349,
       "failSamples": []
     },
     {
@@ -112,7 +116,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 6754,
+      "avgMs": 6857,
       "failSamples": []
     },
     {
@@ -122,7 +126,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 6855,
+      "avgMs": 7648,
       "failSamples": []
     },
     {
@@ -132,7 +136,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 7664,
+      "avgMs": 7864,
       "failSamples": []
     },
     {
@@ -142,7 +146,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3473,
+      "avgMs": 3388,
       "failSamples": []
     },
     {
@@ -152,7 +156,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 2533,
+      "avgMs": 2840,
       "failSamples": []
     },
     {
@@ -162,7 +166,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 3106,
+      "avgMs": 2907,
       "failSamples": []
     },
     {
@@ -172,7 +176,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1558,
+      "avgMs": 2018,
       "failSamples": []
     },
     {
@@ -182,7 +186,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1947,
+      "avgMs": 1860,
       "failSamples": []
     },
     {
@@ -192,7 +196,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 2109,
+      "avgMs": 2403,
       "failSamples": []
     },
     {
@@ -202,7 +206,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 2196,
+      "avgMs": 1644,
       "failSamples": []
     },
     {
@@ -212,7 +216,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1738,
+      "avgMs": 1978,
       "failSamples": []
     },
     {
@@ -222,7 +226,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1708,
+      "avgMs": 1810,
       "failSamples": []
     },
     {
@@ -232,7 +236,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1487,
+      "avgMs": 45,
       "failSamples": []
     },
     {
@@ -242,7 +246,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1896,
+      "avgMs": 48,
       "failSamples": []
     },
     {
@@ -252,7 +256,7 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1650,
+      "avgMs": 1675,
       "failSamples": []
     },
     {
@@ -262,7 +266,67 @@
       "runsPassed": 3,
       "stable": true,
       "unstable": false,
-      "avgMs": 1882,
+      "avgMs": 1862,
+      "failSamples": []
+    },
+    {
+      "id": "persona-chatend-normal",
+      "feature": "persona",
+      "desc": "보통: 잡담 3턴 → 코드 강제 종료",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 4030,
+      "failSamples": []
+    },
+    {
+      "id": "persona-chatend-hard",
+      "feature": "persona",
+      "desc": "어려움: 잡담 2턴 → 더 빨리 종료",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 2432,
+      "failSamples": []
+    },
+    {
+      "id": "persona-meta-block-1",
+      "feature": "persona",
+      "desc": "메타 요청 → 코드 차단(__META__), 금지 표현 없음",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 45,
+      "failSamples": []
+    },
+    {
+      "id": "persona-meta-block-2",
+      "feature": "persona",
+      "desc": "메타 요청(너 AI지) → 코드 차단",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 42,
+      "failSamples": []
+    },
+    {
+      "id": "persona-length-hard",
+      "feature": "persona",
+      "desc": "어려움: 응답이 짧다(1문장 규칙)",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 1186,
+      "failSamples": []
+    },
+    {
+      "id": "persona-noask-normal",
+      "feature": "persona",
+      "desc": "보통: 먼저 캐묻지 않음(물음표 1개 이하)",
+      "runsPassed": 3,
+      "stable": true,
+      "unstable": false,
+      "avgMs": 1197,
       "failSamples": []
     }
   ]
