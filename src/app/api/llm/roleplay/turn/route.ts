@@ -187,8 +187,10 @@ export async function POST(req: NextRequest) {
     guardViolations.push(...guarded.violations);
     const replyText = guarded.ok ? guarded.text : '';
 
-    // 종료 최종 결정: 코드 강제 종료(상태) 우선, 아니면 모델 제안 반영
-    const ended = state.forceEnd || parsed.endsConversation;
+    // 종료는 코드가 결정한다(설계 원칙). 모델의 endsConversation은 조기 종료에 쓰지 않는다 —
+    // 연습 도구에서 잘하고 있는데 모델이 2~3턴 만에 끊으면 연습이 안 된다.
+    // 강제 종료 임계(최대 턴 / 난이도별 잡담 임계)에 도달했을 때만 종료한다.
+    const ended = state.forceEnd;
 
     const lines = replyText ? replyText.split(/(?<=[.!?…])\s+/).filter(Boolean) : ['...'];
     const out = lines.join('\n') + (ended ? '\n__END__' : '') + '\n';

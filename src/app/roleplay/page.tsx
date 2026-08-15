@@ -315,6 +315,16 @@ export default function RoleplayPage() {
           }
         }
         streamDoneRef.current = true;
+        // 사장님 대사를 transcriptRef에 즉시 반영 — setTranscript 커밋이 늦어 종료 시 마지막 대사가
+        // 채점 전사에서 누락되던 문제 방지 (특히 __END__로 바로 finishSession 되는 턴).
+        if (started && ownerText) {
+          const cur = transcriptRef.current;
+          const last = cur[cur.length - 1];
+          transcriptRef.current =
+            last?.speaker === 'owner'
+              ? [...cur.slice(0, -1), { ...last, text: ownerText }]
+              : [...cur, { speaker: 'owner', text: ownerText }];
+        }
         if (!started) {
           // 문장이 하나도 없었음 (전부 필터되었거나 빈 응답)
           setNotice('사장님이 말없이 바라봅니다. 다시 말해보세요.');
