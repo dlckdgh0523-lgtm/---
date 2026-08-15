@@ -100,9 +100,19 @@ export default function RoleplayPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
+  // 턴 요청 파라미터를 ref로 보관 — 음성 경로의 stale closure(startRecognition이 첫 렌더의
+  // sendTurn을 붙듦)로 region/placeId가 비어 400이 나던 문제 방지. 항상 최신값을 전송한다.
+  const turnParamsRef = useRef<{ region: string; placeId?: string; difficulty: Difficulty; ageIdx: number; temperIdx: number }>({
+    region: '',
+    placeId: undefined,
+    difficulty: 'normal',
+    ageIdx: 0,
+    temperIdx: 0,
+  });
 
   transcriptRef.current = transcript;
   bargeInRef.current = bargeIn;
+  turnParamsRef.current = { region, placeId: place?.id, difficulty, ageIdx, temperIdx };
 
   // 쿼리 파라미터로 사업장 로드
   useEffect(() => {
@@ -282,13 +292,16 @@ export default function RoleplayPage() {
         if (voiceMode) startRecognition();
       };
 
+      // 파라미터는 ref에서 읽는다(stale closure 방지) — 음성 경로 400의 원인이었다.
+      const p = turnParamsRef.current;
+      console.log('[roleplay] turn params:', p);
       let raw = '';
       let status = 0;
       try {
         const res = await fetch('/api/llm/roleplay/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ region, placeId: place?.id, difficulty, ageIdx, temperIdx, history, userText }),
+          body: JSON.stringify({ region: p.region, placeId: p.placeId, difficulty: p.difficulty, ageIdx: p.ageIdx, temperIdx: p.temperIdx, history, userText }),
         });
         status = res.status;
         raw = await res.text();
